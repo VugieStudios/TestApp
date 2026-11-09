@@ -8,6 +8,7 @@ const EMPTY = { name: '', emoji: '', schedule: { type: 'daily' }, core: false, g
 
 function GarminRule({ rule, onChange }) {
   const type = rule?.type || 'none'
+  if (rule?.type === 'steps' && rule.min % 500) rule = { ...rule, min: Math.max(500, Math.round(rule.min / 500) * 500) }
   const setType = (t) =>
     onChange(t === 'none' ? null : t === 'activity' ? { type: t, kind: 'any', minMinutes: 20 } : t === 'steps' ? { type: t, min: 10000 } : { type: t, minHours: 7 })
   return (
@@ -28,7 +29,12 @@ function GarminRule({ rule, onChange }) {
         </>
       )}
       {type === 'steps' && (
-        <div className="unit-input"><input type="number" min="100" step="500" value={rule.min} onChange={(e) => onChange({ ...rule, min: Number(e.target.value) || 1000 })} /><span>steps or more</span></div>
+        <div className="unit-input">
+          <select value={rule.min} onChange={(e) => onChange({ ...rule, min: Number(e.target.value) })}>
+            {Array.from({ length: 60 }, (_, i) => (i + 1) * 500).map((n) => <option key={n} value={n}>{n.toLocaleString()}</option>)}
+          </select>
+          <span>steps or more</span>
+        </div>
       )}
       {type === 'sleep' && (
         <div className="unit-input"><input type="number" min="1" max="12" step="0.5" value={rule.minHours} onChange={(e) => onChange({ ...rule, minHours: Number(e.target.value) || 7 })} /><span>hours or more</span></div>
