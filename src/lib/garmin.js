@@ -4,7 +4,7 @@
 // values we need. If something can't be read, the sync keeps a small debug summary.
 import { useCallback, useState } from 'react'
 import { supabase } from './supabase.js'
-import { addDays, daysBetween, todayKey } from './dates.js'
+import { addDays, daysBetween, todayKey, weekStart } from './dates.js'
 
 export const ACTIVITY_KINDS = {
   any: 'Any workout',
@@ -168,7 +168,14 @@ export function parseAll(results) {
 
 export function describeRule(rule) {
   if (!rule) return ''
-  if (rule.type === 'activity') return `${ACTIVITY_KINDS[rule.kind] || 'Workout'} ≥ ${rule.minMinutes} min`
+  if (rule.type === 'activity') {
+    const what = rule.kind === 'any' ? 'workout' : (ACTIVITY_KINDS[rule.kind] || 'Workout').toLowerCase()
+    if (rule.measure === 'count') {
+      const n = rule.count || 1
+      return `${n} ${what}${n === 1 ? '' : 's'} per ${rule.period === 'week' ? 'week' : 'day'}${rule.minEach ? ` (≥ ${rule.minEach} min)` : ''}`
+    }
+    return `${what[0].toUpperCase() + what.slice(1)} ≥ ${rule.minMinutes} min`
+  }
   if (rule.type === 'steps') return `${Number(rule.min).toLocaleString()}+ steps`
   if (rule.type === 'sleep') return `${rule.minHours}+ h sleep`
   return ''
@@ -178,7 +185,20 @@ export function ruleMet(garmin, rule, day) {
   if (!garmin || !rule) return false
   if (rule.type === 'activity') {
     // 'any' counts every workout except walks
-    const mins = garmin.activities.filter((a) => a.date === day && (rule.kind === 'any' ? a.kind !== 'walk' : a.kind === rule.kind)).reduce((n, a) => n + a.minutes, 0)
+    const matches = (a) => (rule.kind === 'any' ? a.kind !== 'walk' : a.kind === rule.kind)
+    if (rule.measure === 'count') {
+      const n = rule.count || 1
+      const ok = (a) => matches(a) && a.minutes >= (rule.minEach || 0)
+      if (rule.period === 'week') {
+        // ticked on the day the weekly count is reached
+        const start = weekStart(day)
+        const upTo = garmin.activities.filter((a) => ok(a) && a.date >= start && a.date <= day).length
+        const before = garmin.activities.filter((a) => ok(a) && a.date >= start && a.date < day).length
+        return upTo >= n && before < n
+      }
+      return garmin.activities.filter((a) => ok(a) && a.date === day).length >= n
+    }
+    const mins = garmin.activities.filter((a) => a.date === day && matches(a)).reduce((n, a) => n + a.minutes, 0)
     return mins >= (rule.minMinutes || 1)
   }
   if (rule.type === 'steps') return (garmin.days[day]?.steps || 0) >= rule.min

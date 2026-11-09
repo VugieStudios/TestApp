@@ -25,7 +25,36 @@ function GarminRule({ rule, onChange }) {
           <select value={rule.kind} onChange={(e) => onChange({ ...rule, kind: e.target.value })}>
             {Object.entries(ACTIVITY_KINDS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
           </select>
-          <div className="unit-input"><span>at least</span><input type="number" min="1" value={rule.minMinutes} onChange={(e) => onChange({ ...rule, minMinutes: Number(e.target.value) || 1 })} /><span>minutes</span></div>
+          <Seg
+            small
+            value={rule.measure || 'minutes'}
+            onChange={(measure) => onChange({ count: 3, period: 'week', minEach: 20, ...rule, measure })}
+            options={[['minutes', 'By duration'], ['count', 'By number of workouts']]}
+          />
+          {(rule.measure || 'minutes') === 'minutes' ? (
+            <div className="unit-input"><span>at least</span><input type="number" min="1" value={rule.minMinutes} onChange={(e) => onChange({ ...rule, minMinutes: Number(e.target.value) || 1 })} /><span>minutes that day</span></div>
+          ) : (
+            <>
+              <div className="unit-input">
+                <select value={rule.count} onChange={(e) => onChange({ ...rule, count: Number(e.target.value) })}>
+                  {Array.from({ length: 14 }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n}</option>)}
+                </select>
+                <span>workout{rule.count === 1 ? '' : 's'}</span>
+                <select value={rule.period} onChange={(e) => onChange({ ...rule, period: e.target.value })}>
+                  <option value="week">per week</option>
+                  <option value="day">in one day</option>
+                </select>
+              </div>
+              <div className="unit-input">
+                <span>each at least</span>
+                <input type="number" min="0" value={rule.minEach} onChange={(e) => onChange({ ...rule, minEach: Number(e.target.value) || 0 })} />
+                <span>min</span>
+              </div>
+              {rule.period === 'week' && (
+                <p className="muted small">Ticks off once, on the day you reach {rule.count}. Use it with the schedule “X per week” set to 1. Tip: for a habit like “Work out 3× per week”, choose “By duration” instead; then every workout ticks off a day.</p>
+              )}
+            </>
+          )}
         </>
       )}
       {type === 'steps' && (
