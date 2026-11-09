@@ -46,14 +46,14 @@ function Goal({ goal, actions }) {
 
       {!goal.done && (
         <form className="row" onSubmit={addStep}>
-          <input className="grow" placeholder="Add a small next step" value={step} onChange={(e) => setStep(e.target.value)} />
+          <input className="grow" placeholder="Add a small next step (+20 XP each)" value={step} onChange={(e) => setStep(e.target.value)} />
           <button>Add</button>
         </form>
       )}
 
       <div className="row tight end">
         <button className="ghost small" onClick={() => actions.editGoal(goal.id, { done: !goal.done })}>
-          {goal.done ? 'Reopen' : 'Mark achieved'}
+          {goal.done ? 'Reopen' : 'Mark achieved 🏆 +100 XP'}
         </button>
         <button className="ghost small danger" onClick={() => window.confirm(`Delete "${goal.title}"?`) && actions.deleteGoal(goal.id)}>
           Delete

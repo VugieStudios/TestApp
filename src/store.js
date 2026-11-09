@@ -16,7 +16,8 @@ const DEFAULT_DATA = {
   ],
   checks: {}, // { 'YYYY-MM-DD': { habitId: true } }
   entries: {}, // { 'YYYY-MM-DD': { gratitude, win, improve, notes } }
-  goals: [], // [{ id, title, why, deadline, done, steps: [{ id, text, done }] }]
+  goals: [], // [{ id, title, why, deadline, done, steps: [{ id, text, done, doneAt }] }]
+  seen: null, // { level, badges: [] } already celebrated
 }
 
 function readLocal(key) {
@@ -156,6 +157,7 @@ export function useStore(user) {
       update((d) => {
         const step = d.goals.find((g) => g.id === goalId).steps.find((s) => s.id === stepId)
         step.done = !step.done
+        step.doneAt = step.done ? todayKey() : null
         return d
       })
     },
@@ -163,6 +165,14 @@ export function useStore(user) {
       update((d) => {
         const goal = d.goals.find((g) => g.id === goalId)
         goal.steps = goal.steps.filter((s) => s.id !== stepId)
+        return d
+      })
+    },
+
+    // Game: remember which level/badges have been celebrated already
+    markSeen(level, badgeIds) {
+      update((d) => {
+        d.seen = { level, badges: badgeIds }
         return d
       })
     },
