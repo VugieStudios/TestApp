@@ -1,6 +1,7 @@
 import { addDays, addMonths, fmtMinutes, lastDays, monthEnd, monthKey, monthStart, range, shortDate, todayKey, weekday, weekStart, WEEKDAYS } from './dates.js'
 import { active, dayCompletion, isDone, isScheduled, weekCount } from './habits.js'
 import { hasJournal } from './game.js'
+import { garminRange } from './garmin.js'
 
 // ── Per-day numbers ──────────────────────────────────────────────────────────
 // Day score (0–1): mostly habits, plus focus time and moving goals/tasks forward.
@@ -171,7 +172,43 @@ export function insights(data, days = 60) {
     })
   }
 
-  // 7. Recurring energy drains from the journal
+  // 7. Garmin: sleep → next-day habits, workouts ↔ habits
+  const g = data.garmin
+  if (g?.enabled) {
+    const rows = past.map((s) => ({ c: s.completion, sleep: g.days[s.day]?.sleepMin, trained: g.activities.some((a) => a.date === s.day && a.kind !== 'walk') }))
+    const good = rows.filter((r) => r.sleep >= 420)
+    const short = rows.filter((r) => r.sleep && r.sleep < 420)
+    if (good.length >= 3 && short.length >= 3) {
+      const d = avg(good.map((r) => r.c)) - avg(short.map((r) => r.c))
+      if (Math.abs(d) >= 0.1) {
+        out.push({
+          icon: '🌙',
+          weight: Math.abs(d) + 0.1,
+          title: d > 0 ? 'Sleep drives your discipline' : 'Short nights don’t stop you',
+          text: d > 0
+            ? `After 7+ hours of sleep you complete ${pctTxt(avg(good.map((r) => r.c)))} of your habits, versus ${pctTxt(avg(short.map((r) => r.c)))} after shorter nights.`
+            : `Interesting: you complete more habits after short nights (${pctTxt(avg(short.map((r) => r.c)))}). Still, keep an eye on recovery.`,
+        })
+      }
+    }
+    const tr = rows.filter((r) => r.trained)
+    const rest = rows.filter((r) => !r.trained)
+    if (tr.length >= 3 && rest.length >= 3) {
+      const d = avg(tr.map((r) => r.c)) - avg(rest.map((r) => r.c))
+      if (Math.abs(d) >= 0.12) {
+        out.push({
+          icon: '🏋️',
+          weight: Math.abs(d),
+          title: d > 0 ? 'Training days are your best days' : 'Training days drain your habits',
+          text: d > 0
+            ? `On days you work out you complete ${pctTxt(avg(tr.map((r) => r.c)))} of your habits, versus ${pctTxt(avg(rest.map((r) => r.c)))} on rest days.`
+            : `On workout days your other habits drop to ${pctTxt(avg(tr.map((r) => r.c)))}. Do the small ones before you train.`,
+        })
+      }
+    }
+  }
+
+  // 8. Recurring energy drains from the journal
   const drains = topWords(Object.entries(data.entries).filter(([d]) => d >= addDays(todayKey(), -days)).map(([, e]) => e.drain))
   if (drains.length) {
     out.push({ icon: '🪫', weight: 0.2, title: 'Recurring energy drains', text: `"${drains.slice(0, 3).join('", "')}" keep showing up in your journal. Can you remove or reduce one of them?` })
@@ -277,6 +314,14 @@ export function review(data, game, period) {
   }
   if (cur.focus) lines.push(`You focused for ${fmtMinutes(cur.focus)}${prev.focus ? ` (last ${noun}: ${fmtMinutes(prev.focus)})` : ''}.`)
   if (cur.steps || cur.goalsDone) lines.push(`You finished ${cur.steps} micro-goal${cur.steps === 1 ? '' : 's'}${cur.goalsDone ? ` and achieved ${cur.goalsDone} goal${cur.goalsDone === 1 ? '' : 's'} 🏆` : ''}.`)
+  const gc = garminRange(data.garmin, period.start, period.end)
+  const gp = garminRange(data.garmin, prevP.start, prevP.end)
+  if (gc && (gc.activities || gc.avgSleepMin)) {
+    let l = ''
+    if (gc.activities) l += `Garmin: ${gc.activities} workout${gc.activities === 1 ? '' : 's'}, ${fmtMinutes(gc.trainingMin)} of training${gc.km ? `, ${gc.km} km` : ''}${gp?.trainingMin ? ` (last ${noun}: ${fmtMinutes(gp.trainingMin)})` : ''}.`
+    if (gc.avgSleepMin) l += ` Average sleep ${Math.floor(gc.avgSleepMin / 60)}h ${String(Math.round(gc.avgSleepMin % 60)).padStart(2, '0')}m.`
+    lines.push(l.trim())
+  }
   if (cur.journals) lines.push(`You reflected in your journal on ${cur.journals} day${cur.journals === 1 ? '' : 's'}.`)
   if (cur.lowDays) lines.push(`You used Low Energy Mode on ${cur.lowDays} day${cur.lowDays === 1 ? '' : 's'}. Protecting your core habits on hard days is a win.`)
   if (cur.drains.length) lines.push(`Recurring energy drains: ${cur.drains.slice(0, 3).join(', ')}.`)
@@ -284,6 +329,7 @@ export function review(data, game, period) {
   // One concrete suggestion for next time
   let advice
   if (sorted.length && sorted.at(-1).rate < 0.5) advice = `Make "${sorted.at(-1).h.name}" easier next ${noun}: shrink it, or move it to fewer days.`
+  else if (gc?.avgSleepMin && gc.avgSleepMin < 400) advice = `You averaged under 7 hours of sleep. An earlier bedtime is probably the easiest win for next ${noun}.`
   else if (cur.lowDays >= 3) advice = 'You had several low-energy days. Plan fewer things and protect your sleep.'
   else if (!cur.focus) advice = 'Try one 25-minute focus session on your most important micro-goal.'
   else if (cur.completion !== null && cur.completion >= 0.85) advice = 'You are crushing it. Consider adding one new small habit or a bigger goal.'

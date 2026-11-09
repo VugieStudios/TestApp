@@ -416,3 +416,16 @@ input[type='checkbox'] { width: 20px; height: 20px; accent-color: var(--accent);
 .danger-btn { background: var(--danger); color: #2a0606; border-color: var(--danger); }
 .insight.example { opacity: 0.6; border-style: dashed; }
 div.insight.example { border: none; }
+
+/* Garmin */
+.g-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.g-tiles div { display: flex; flex-direction: column; gap: 2px; padding: 10px; border-radius: 12px; background: var(--bg-2); }
+.g-tiles b { font-size: 1.1rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.g-tiles span { font-size: 0.7rem; color: var(--muted); }
+.bars { width: 100%; height: auto; }
+.bars .axis { fill: var(--muted); font-size: 9px; }
+.bars .goal-line { stroke: var(--gold); stroke-dasharray: 4 4; opacity: 0.6; }
+.debug { max-height: 260px; overflow: auto; font-size: 0.7rem; background: var(--bg-2); border: 1px solid var(--line); border-radius: 10px; padding: 10px; white-space: pre-wrap; word-break: break-all; margin: 0; }
+.error-box { padding: 10px 12px; border-radius: 10px; background: rgba(255, 107, 107, 0.08); border: 1px solid rgba(255, 107, 107, 0.35); color: var(--danger); font-size: 0.85rem; }
+.warn-text { color: var(--warn); }
+.review-stats em { font-style: normal; }

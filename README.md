@@ -16,11 +16,17 @@ src/
     game.js       XP per day, levels, ranks, badges, daily quests
     analytics.js  day scores, pattern insights (correlations), weekly/monthly reviews
     timer.jsx     shared Pomodoro timer (survives tab switches and reloads)
+    garmin.js     Garmin sync, parsing and habit auto-complete rules
     supabase.js   login + database connection
   components/     shared UI: rings, sheets, player card, celebrations, 1-minute kicker
   widgets/        dashboard widgets (habits, micro-goals, focus, tasks, check-in, journal, dump, grid, insights)
   views/          screens: Today (dashboard), Habits, Goals, Mind, Stats, Profile, Login
 ```
+
+Garmin: `supabase/functions/garmin-sync/index.ts` is a small Supabase Edge Function that keeps the
+Garmin Personal API key secret (`GARMIN_API_KEY`), exchanges it for a token and returns raw Garmin
+data. `src/lib/garmin.js` interprets that data (workouts, steps, sleep, body battery) and auto-completes
+habits that have a Garmin rule.
 
 All data is one JSON document per user in the Supabase `user_data` table, cached in the browser for instant and offline use. All XP is derived from the data, so it can't drift or be farmed.
 

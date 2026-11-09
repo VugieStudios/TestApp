@@ -3,6 +3,7 @@ import { Card, Seg, XpChip } from '../components/ui.jsx'
 import { addDays, addMonths, fmtMinutes, monthEnd, monthKey, monthStart, prettyDate, range, shortDate, todayKey, weekday, weekStart } from '../lib/dates.js'
 import { dayStats, EXAMPLE_INSIGHTS, insights, MIN_DAYS, periodFor, review, shiftPeriod } from '../lib/analytics.js'
 import { XP } from '../lib/game.js'
+import { BodyStats } from '../components/garmin.jsx'
 
 const METRICS = [
   ['score', 'Day score'],
@@ -228,7 +229,7 @@ function Reviews({ data, actions, game }) {
 }
 
 export default function Stats(props) {
-  const [tab, setTab] = useState('calendar')
+  const [tab, setTab] = useState(props.sub || 'calendar')
   const pending = useMemo(() => {
     const w = periodFor('week', addDays(todayKey(), -7))
     const m = periodFor('month', monthStart(addMonths(monthKey(todayKey()), -1)))
@@ -237,10 +238,11 @@ export default function Stats(props) {
   return (
     <div className="stack">
       <header className="page-head"><h1>Stats</h1></header>
-      <Seg value={tab} onChange={setTab} options={[['calendar', 'Calendar'], ['insights', 'Insights'], ['reviews', `Reviews${pending ? ` (${pending})` : ''}`]]} />
+      <Seg value={tab} onChange={setTab} options={[['calendar', 'Calendar'], ['insights', 'Insights'], ['reviews', `Reviews${pending ? ` (${pending})` : ''}`], ...(props.data.garmin?.enabled ? [['body', 'Body']] : [])]} />
       {tab === 'calendar' && <Calendar {...props} />}
       {tab === 'insights' && <Insights {...props} />}
       {tab === 'reviews' && <Reviews {...props} />}
+      {tab === 'body' && <BodyStats {...props} />}
     </div>
   )
 }

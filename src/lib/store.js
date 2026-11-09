@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { todayKey } from './dates.js'
+import { addDays as addDaysLocal, todayKey } from './dates.js'
 import { supabase } from './supabase.js'
+import { ruleMet } from './garmin.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Data model (version 2). Everything lives in one JSON object that is saved to
@@ -19,6 +20,8 @@ import { supabase } from './supabase.js'
 // lowEnergy:{ 'YYYY-MM-DD': true }
 // reviews:  { 'W:2026-11-02': date, 'M:2026-10': date }   completed reviews
 // best:     { habitId: longest streak }
+// garmin:   { enabled, lastSync, error, days: { date: { steps, sleepMin, sleepScore, restingHr, stress, bbHigh, bbLow } },
+//             activities: [{ id, date, name, kind, minutes, km, avgHr }], auto: { date: { habitId: true } }, debug }
 // settings: { freezesPerWeek, focusMinutes, breakMinutes, dashboard: [{ id, hidden }] }
 // seen:     { level, badges: [] }             celebrations already shown
 // ─────────────────────────────────────────────────────────────────────────────
@@ -30,6 +33,7 @@ export const DEFAULT_DASHBOARD = [
   'player',
   'quests',
   'habits',
+  'garmin',
   'micro',
   'focus',
   'tasks',
@@ -330,6 +334,47 @@ export function useStore(user) {
     replaceAll(newData) {
       setData(migrate(newData))
     },
+    // ── Garmin ──
+    setGarminEnabled(on) {
+      update((d) => {
+        d.garmin = { ...(d.garmin || { days: {}, activities: [], auto: {} }), enabled: on, error: null }
+      })
+    },
+    garminError(message) {
+      update((d) => {
+        d.garmin = { ...(d.garmin || { days: {}, activities: [], auto: {} }), error: message, lastAttempt: new Date().toISOString() }
+      })
+    },
+    applyGarmin(parsed, start, end) {
+      update((d) => {
+        const g = { days: {}, activities: [], auto: {}, ...(d.garmin || {}) }
+        const cutoff = addDaysLocal(todayKey(), -200)
+        for (const [day, v] of Object.entries(parsed.days)) g.days[day] = { ...(g.days[day] || {}), ...v }
+        const byId = new Map(g.activities.filter((a) => a.date < start || a.date > end).map((a) => [a.id, a]))
+        parsed.activities.forEach((a) => byId.set(a.id, a))
+        g.activities = [...byId.values()].filter((a) => a.date >= cutoff).sort((a, b) => b.date.localeCompare(a.date))
+        g.days = Object.fromEntries(Object.entries(g.days).filter(([day]) => day >= cutoff))
+        g.enabled = true
+        g.lastSync = new Date().toISOString()
+        g.error = null
+        g.debug = parsed.debug
+        // Tick habits whose Garmin rule was met (each day only once, so you can still untick)
+        for (const h of d.habits.filter((x) => x.garmin && !x.archived)) {
+          for (let day = start; day <= end; day = addDaysLocal(day, 1)) {
+            if (day < h.createdAt || g.auto[day]?.[h.id]) continue
+            if (ruleMet(g, h.garmin, day)) {
+              d.checks[day] ??= {}
+              d.checks[day][h.id] = true
+              g.auto[day] ??= {}
+              g.auto[day][h.id] = true
+            }
+          }
+        }
+        g.auto = Object.fromEntries(Object.entries(g.auto).filter(([day]) => day >= cutoff))
+        d.garmin = g
+      })
+    },
+
     // Wipe everything and start with a clean slate (login stays the same)
     resetAll() {
       try {

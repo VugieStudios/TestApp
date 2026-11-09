@@ -1,12 +1,44 @@
 import { useState } from 'react'
 import { Card, Seg } from '../components/ui.jsx'
 import { lastDays, prettyDate, todayKey, WEEKDAYS } from '../lib/dates.js'
+import { ACTIVITY_KINDS, describeRule } from '../lib/garmin.js'
 import { bestStreak, describeSchedule, isDone, isExcused, isScheduled, streakInfo, weekCount } from '../lib/habits.js'
 
-const EMPTY = { name: '', emoji: '', schedule: { type: 'daily' }, core: false }
+const EMPTY = { name: '', emoji: '', schedule: { type: 'daily' }, core: false, garmin: null }
 
-function HabitForm({ initial = EMPTY, onSave, onCancel, submitLabel }) {
-  const [f, setF] = useState(initial)
+function GarminRule({ rule, onChange }) {
+  const type = rule?.type || 'none'
+  const setType = (t) =>
+    onChange(t === 'none' ? null : t === 'activity' ? { type: t, kind: 'any', minMinutes: 20 } : t === 'steps' ? { type: t, min: 10000 } : { type: t, minHours: 7 })
+  return (
+    <div className="measure">
+      <p className="label">⌚ Auto-complete with Garmin</p>
+      <select value={type} onChange={(e) => setType(e.target.value)}>
+        <option value="none">Off: I tick it myself</option>
+        <option value="activity">When I log a workout</option>
+        <option value="steps">When I reach a step count</option>
+        <option value="sleep">When I sleep long enough</option>
+      </select>
+      {type === 'activity' && (
+        <>
+          <select value={rule.kind} onChange={(e) => onChange({ ...rule, kind: e.target.value })}>
+            {Object.entries(ACTIVITY_KINDS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+          </select>
+          <div className="unit-input"><span>at least</span><input type="number" min="1" value={rule.minMinutes} onChange={(e) => onChange({ ...rule, minMinutes: Number(e.target.value) || 1 })} /><span>minutes</span></div>
+        </>
+      )}
+      {type === 'steps' && (
+        <div className="unit-input"><input type="number" min="100" step="500" value={rule.min} onChange={(e) => onChange({ ...rule, min: Number(e.target.value) || 1000 })} /><span>steps or more</span></div>
+      )}
+      {type === 'sleep' && (
+        <div className="unit-input"><input type="number" min="1" max="12" step="0.5" value={rule.minHours} onChange={(e) => onChange({ ...rule, minHours: Number(e.target.value) || 7 })} /><span>hours or more</span></div>
+      )}
+    </div>
+  )
+}
+
+function HabitForm({ initial = EMPTY, onSave, onCancel, submitLabel, garminOn }) {
+  const [f, setF] = useState({ garmin: null, ...initial })
   const s = f.schedule
   const setSchedule = (type) =>
     setF({ ...f, schedule: type === 'daily' ? { type } : type === 'days' ? { type, days: s.days || [0, 2, 4] } : { type, times: s.times || 3 } })
@@ -56,6 +88,7 @@ function HabitForm({ initial = EMPTY, onSave, onCancel, submitLabel }) {
         </span>
         <input type="checkbox" checked={f.core} onChange={(e) => setF({ ...f, core: e.target.checked })} />
       </label>
+      {garminOn && <GarminRule rule={f.garmin} onChange={(garmin) => setF({ ...f, garmin })} />}
       <div className="row tight end">
         {onCancel && <button type="button" className="ghost" onClick={onCancel}>Cancel</button>}
         <button className="primary">{submitLabel}</button>
@@ -89,7 +122,7 @@ function HabitCard({ data, actions, h }) {
   if (editing) {
     return (
       <Card title="Edit habit">
-        <HabitForm initial={h} submitLabel="Save" onCancel={() => setEditing(false)} onSave={(f) => { actions.editHabit(h.id, f); setEditing(false) }} />
+        <HabitForm initial={h} garminOn={!!data.garmin?.enabled} submitLabel="Save" onCancel={() => setEditing(false)} onSave={(f) => { actions.editHabit(h.id, f); setEditing(false) }} />
       </Card>
     )
   }
@@ -103,6 +136,7 @@ function HabitCard({ data, actions, h }) {
             <p className="muted small">
               {describeSchedule(h.schedule)}
               {h.schedule.type === 'weekly' && ` · ${weekCount(data, h, todayKey())}/${h.schedule.times} this week`}
+              {h.garmin && data.garmin?.enabled && <span className="tag good">⌚ {describeRule(h.garmin)}</span>}
             </p>
           </div>
         </div>
@@ -135,7 +169,7 @@ export default function Habits({ data, actions }) {
 
       {adding && (
         <Card title="New habit">
-          <HabitForm submitLabel="Add habit" onCancel={() => setAdding(false)} onSave={(f) => { actions.addHabit(f); setAdding(false) }} />
+          <HabitForm garminOn={!!data.garmin?.enabled} submitLabel="Add habit" onCancel={() => setAdding(false)} onSave={(f) => { actions.addHabit(f); setAdding(false) }} />
         </Card>
       )}
 

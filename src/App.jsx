@@ -4,6 +4,7 @@ import { supabase } from './lib/supabase.js'
 import { computeGame, rankFor } from './lib/game.js'
 import { streak } from './lib/habits.js'
 import { todayKey } from './lib/dates.js'
+import { useGarminSync } from './lib/garmin.js'
 import { TimerProvider, fmtTime, useTimer } from './lib/timer.jsx'
 import { BadgeToast, Kickstart, LevelUp, XpFloats } from './components/game.jsx'
 import { Sheet } from './components/ui.jsx'
@@ -65,6 +66,7 @@ function TimerPill({ onClick }) {
 
 function Shell({ data, actions, status }) {
   const [tab, setTab] = useState('today')
+  const [sub, setSub] = useState(null)
   const [dumpOpen, setDumpOpen] = useState(false)
   const [dumpText, setDumpText] = useState('')
   const [dumpSaved, setDumpSaved] = useState(0)
@@ -72,10 +74,21 @@ function Shell({ data, actions, status }) {
   const timer = useTimer()
   const game = useMemo(() => computeGame(data), [data])
 
-  const goTo = (t) => {
+  const goTo = (t, subTab = null) => {
     setTab(t)
+    setSub(subTab)
     window.scrollTo({ top: 0 })
   }
+  const garmin = useGarminSync(data, actions)
+
+  // Garmin: sync on open, at most every 3 hours
+  const autoSynced = useRef(false)
+  useEffect(() => {
+    if (status === 'loading' || autoSynced.current || !data.garmin?.enabled) return
+    autoSynced.current = true
+    const last = data.garmin.lastSync || data.garmin.lastAttempt
+    if (!last || Date.now() - new Date(last) > 3 * 3600 * 1000) garmin.sync()
+  }, [status]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const ui = {
     goTo,
@@ -86,6 +99,7 @@ function Shell({ data, actions, status }) {
       goTo('today')
     },
     openDump: () => setDumpOpen(true),
+    garmin,
   }
 
   // remember best streaks so they survive edits
@@ -160,7 +174,7 @@ function Shell({ data, actions, status }) {
       </header>
 
       <main className="content">
-        <View data={data} actions={actions} game={game} ui={ui} goTo={goTo} />
+        <View key={tab + (sub || '')} data={data} actions={actions} game={game} ui={ui} goTo={goTo} sub={sub} />
       </main>
 
       <button className="fab" onClick={() => setDumpOpen(true)} aria-label="Brain dump">

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Card, Ring, XpChip } from '../components/ui.jsx'
 import { PlayerCard } from '../components/game.jsx'
+import { GarminWidget } from '../components/garmin.jsx'
 import { todayKey } from '../lib/dates.js'
 import { habitsForDay, isDone, streakInfo, weekCount } from '../lib/habits.js'
 import { microGoals } from '../lib/goals.js'
@@ -86,6 +87,7 @@ export function HabitsWidget({ data, actions, ui, low }) {
                   {weekly && `${weekCount(data, h, today)}/${h.schedule.times} this week · `}
                   {s.count > 0 ? `🔥 ${s.count} ${s.unit}${s.count === 1 ? '' : 's'}` : 'Start a streak'}
                   {s.frozen.size > 0 && ' · ❄ saved'}
+                  {h.garmin && data.garmin?.enabled && ' · ⌚ auto'}
                 </p>
               </div>
               <XpChip n={XP.habit} done={d} />
@@ -314,6 +316,7 @@ export const WIDGETS = {
   player: { name: 'Level & XP', component: PlayerWidget, low: true },
   quests: { name: 'Daily quests', component: QuestsWidget, low: true },
   habits: { name: 'Habits', component: HabitsWidget, low: true },
+  garmin: { name: 'Garmin (steps, sleep, workouts)', component: GarminWidget },
   micro: { name: 'Micro-goals', component: MicroWidget, low: true },
   focus: { name: 'Focus timer', component: FocusWidget },
   tasks: { name: 'Tasks', component: TasksWidget },
@@ -323,8 +326,8 @@ export const WIDGETS = {
 }
 
 export const PRESETS = {
-  Balanced: ['player', 'quests', 'habits', 'micro', 'focus', 'tasks', 'journal', 'dump', 'insights'],
-  'Deep work': ['focus', 'micro', 'tasks', 'habits', 'quests', 'dump', 'player', 'journal', 'insights'],
-  Wellbeing: ['journal', 'dump', 'habits', 'quests', 'insights', 'player', 'micro', 'focus', 'tasks'],
+  Balanced: ['player', 'quests', 'habits', 'garmin', 'micro', 'focus', 'tasks', 'journal', 'dump', 'insights'],
+  'Deep work': ['focus', 'micro', 'tasks', 'habits', 'quests', 'dump', 'player', 'garmin', 'journal', 'insights'],
+  Wellbeing: ['journal', 'dump', 'habits', 'garmin', 'quests', 'insights', 'player', 'micro', 'focus', 'tasks'],
 }
 

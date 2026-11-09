@@ -5,8 +5,9 @@ import { RANKS, XP } from '../lib/game.js'
 import { fmtMinutes, todayKey } from '../lib/dates.js'
 import { supabase } from '../lib/supabase.js'
 import { useTimer } from '../lib/timer.jsx'
+import { GarminCard } from '../components/garmin.jsx'
 
-export default function Profile({ data, actions, game }) {
+export default function Profile({ data, actions, game, ui }) {
   const fileRef = useRef()
   const [resetting, setResetting] = useState(false)
   const timer = useTimer()
@@ -99,6 +100,8 @@ export default function Profile({ data, actions, game }) {
           <Seg small value={data.settings.freezesPerWeek} onChange={(v) => actions.setSettings({ freezesPerWeek: v })} options={[[0, '0'], [1, '1'], [2, '2']]} />
         </div>
       </Card>
+
+      <GarminCard data={data} actions={actions} ui={ui} />
 
       <Card title="Data" icon="⬇">
         <p className="muted small">Your data syncs to your account automatically. A backup file is extra safety.</p>
