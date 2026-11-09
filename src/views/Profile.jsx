@@ -78,6 +78,7 @@ export default function Profile({ data, actions, game, ui }) {
           <li><span>Achieve a goal</span><b>+{XP.goal}</b></li>
           <li><span>Focus</span><b>+{XP.focusMinute}/min · +{XP.focusSession} per session</b></li>
           <li><span>1-minute rule start</span><b>+{XP.kick}</b></li>
+          <li><span>Finish a planned workout</span><b>+{XP.session}</b></li>
           <li><span>Finish a task</span><b>+{XP.task}</b></li>
           <li><span>Journal</span><b>+{XP.journal}</b></li>
           <li><span>All daily quests</span><b>+{XP.allQuests}</b></li>

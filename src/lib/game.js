@@ -11,6 +11,7 @@ export const XP = {
   step: 20,
   goal: 100,
   task: 5,
+  session: 30,
   journal: 15,
   focusMinute: 1,
   focusSession: 10,
@@ -58,7 +59,8 @@ function questState(data, day) {
   const progress =
     data.goals.some((g) => g.steps.some((s) => s.done && s.doneAt === day)) ||
     data.focus.some((f) => f.date === day && f.minutes >= 15) ||
-    data.tasks.some((t) => t.done && t.doneAt === day)
+    data.tasks.some((t) => t.done && t.doneAt === day) ||
+    Object.values(data.training?.logs?.[day] || {}).some((l) => l.done)
   const entry = data.entries[day]
   const reflect = hasJournal(entry)
   return { low, habits, habitsDone, allHabits: habits.length > 0 && habitsDone === habits.length, progress, reflect }
@@ -68,7 +70,7 @@ export function questsFor(data, day = todayKey()) {
   const q = questState(data, day)
   const list = [
     { id: 'habits', text: q.low ? 'Do your core habits' : 'Complete today’s habits', done: q.allHabits, xp: XP.completeDay, progress: `${q.habitsDone}/${q.habits.length}` },
-    { id: 'progress', text: 'Move a goal forward (micro-goal, task or 15 min focus)', done: q.progress, xp: XP.step },
+    { id: 'progress', text: 'Make progress (micro-goal, workout, task or 15 min focus)', done: q.progress, xp: XP.step },
     { id: 'reflect', text: q.low ? 'Write one line: how was today?' : 'Reflect in your journal', done: q.reflect, xp: XP.journal },
   ]
   if (q.low) list.splice(1, 1) // low energy: no pressure to make progress
@@ -91,6 +93,7 @@ export function xpByDay(data) {
     if (g.done) add(g.doneAt || todayKey(), XP.goal)
   }
   data.tasks.forEach((t) => t.done && add(t.doneAt, XP.task))
+  for (const [day, logs] of Object.entries(data.training?.logs || {})) add(day, Object.values(logs).filter((l) => l.done).length * XP.session)
   for (const [day, e] of Object.entries(data.entries)) {
     if (hasJournal(e)) add(day, XP.journal)
   }
@@ -137,6 +140,7 @@ export function computeGame(data) {
     goalsDone: data.goals.filter((g) => g.done).length,
     goals: data.goals.length,
     tasksDone: data.tasks.filter((t) => t.done).length,
+    workouts: Object.values(data.training?.logs || {}).reduce((n, l) => n + Object.values(l).filter((x) => x.done).length, 0),
     focusMinutes: data.focus.reduce((n, f) => n + f.minutes, 0),
     focusSessions: data.focus.filter((f) => f.minutes >= 20).length,
     kicks: data.kicks.length,
@@ -162,6 +166,8 @@ export const BADGES = [
   { id: 'streak30', icon: '⚡', name: 'Unbroken', desc: '30-day streak on a habit', test: (s) => s.bestStreak >= 30 },
   { id: 'streak100', icon: '💎', name: 'Centennial', desc: '100-day streak', test: (s) => s.bestStreak >= 100 },
   { id: 'complete10', icon: '★', name: 'Consistent', desc: '10 fully completed days', test: (s) => s.completeDays >= 10 },
+  { id: 'workout1', icon: '🏋️', name: 'First Rep', desc: 'Finish a planned workout', test: (s) => s.workouts >= 1 },
+  { id: 'workout25', icon: '⚙', name: 'Iron Will', desc: '25 planned workouts done', test: (s) => s.workouts >= 25 },
   { id: 'focus1', icon: '⏱', name: 'Deep Work', desc: 'Finish a focus session', test: (s) => s.focusSessions >= 1 },
   { id: 'focus600', icon: '🧠', name: 'Flow State', desc: '10 hours of focus', test: (s) => s.focusMinutes >= 600 },
   { id: 'kick5', icon: '🚀', name: 'Just Start', desc: 'Use the 1-minute rule 5×', test: (s) => s.kicks >= 5 },

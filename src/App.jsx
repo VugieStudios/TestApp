@@ -15,15 +15,19 @@ import Goals from './views/Goals.jsx'
 import Mind from './views/Mind.jsx'
 import Stats from './views/Stats.jsx'
 import Profile from './views/Profile.jsx'
+import Train from './views/Train.jsx'
+import { WorkoutLogger } from './components/workout.jsx'
+import { sessionById } from './lib/training.js'
 
 const TABS = [
   { id: 'today', label: 'Today', icon: '◉' },
   { id: 'habits', label: 'Habits', icon: '↻' },
+  { id: 'train', label: 'Train', icon: '⚡' },
   { id: 'goals', label: 'Goals', icon: '◎' },
   { id: 'mind', label: 'Mind', icon: '✎' },
   { id: 'stats', label: 'Stats', icon: '▦' },
 ]
-const VIEWS = { today: Today, habits: Habits, goals: Goals, mind: Mind, stats: Stats, profile: Profile }
+const VIEWS = { today: Today, habits: Habits, train: Train, goals: Goals, mind: Mind, stats: Stats, profile: Profile }
 
 const STATUS = { loading: 'Loading…', saving: 'Saving…', saved: 'Saved', offline: 'Not synced' }
 
@@ -71,6 +75,7 @@ function Shell({ data, actions, status }) {
   const [dumpText, setDumpText] = useState('')
   const [dumpSaved, setDumpSaved] = useState(0)
   const [kickTarget, setKickTarget] = useState(null)
+  const [workout, setWorkout] = useState(null) // { date, sessionId }
   const timer = useTimer()
   const game = useMemo(() => computeGame(data), [data])
 
@@ -109,6 +114,7 @@ function Shell({ data, actions, status }) {
       goTo('today')
     },
     openDump: () => setDumpOpen(true),
+    logWorkout: (date, sessionId) => setWorkout({ date, sessionId }),
     garmin,
   }
 
@@ -205,6 +211,10 @@ function Shell({ data, actions, status }) {
           <span className="grow muted small">{dumpSaved > 0 && `✓ ${dumpSaved} saved`}</span>
           <button className="primary" onClick={saveDump} disabled={!dumpText.trim()}>Dump it</button>
         </div>
+      </Sheet>
+
+      <Sheet open={!!workout} onClose={() => setWorkout(null)} title={workout ? sessionById(data, workout.sessionId)?.name || 'Workout' : ''}>
+        {workout && <WorkoutLogger data={data} actions={actions} date={workout.date} sessionId={workout.sessionId} onClose={() => setWorkout(null)} />}
       </Sheet>
 
       <XpFloats floats={floats} />

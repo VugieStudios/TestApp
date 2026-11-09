@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { addDays as addDaysLocal, todayKey } from './dates.js'
 import { supabase } from './supabase.js'
 import { ruleMet } from './garmin.js'
+import { emptyTraining, SPORTS } from './training.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Data model (version 2). Everything lives in one JSON object that is saved to
@@ -22,6 +23,7 @@ import { ruleMet } from './garmin.js'
 // best:     { habitId: longest streak }
 // garmin:   { enabled, lastSync, error, days: { date: { steps, sleepMin, sleepScore, restingHr, stress, bbHigh, bbLow } },
 //             activities: [{ id, date, name, kind, minutes, km, avgHr }], auto: { date: { habitId: true } }, debug }
+// training: see lib/training.js (weekly scheme, sessions, workout logs)
 // settings: { freezesPerWeek, focusMinutes, breakMinutes, dashboard: [{ id, hidden }] }
 // seen:     { level, badges: [] }             celebrations already shown
 // ─────────────────────────────────────────────────────────────────────────────
@@ -33,6 +35,7 @@ export const DEFAULT_DASHBOARD = [
   'player',
   'quests',
   'habits',
+  'training',
   'garmin',
   'micro',
   'focus',
@@ -125,6 +128,55 @@ function writeLocal(key, data) {
 }
 
 export const uid = () => Math.random().toString(36).slice(2, 10)
+
+// A logged lift can complete steps of a "level" goal, e.g. logging Bench press 45 kg
+// completes "Bench 42.5 kg" and "Bench 45 kg" in the goal "Bench 65 kg".
+function linkLiftsToGoals(d, session, log, date) {
+  for (const e of session.exercises) {
+    const weights = (log.sets?.[e.id] || []).filter((s) => s.done && Number(s.reps) > 0).map((s) => Number(s.weight)).filter((w) => w > 0)
+    if (!weights.length) continue
+    const max = Math.max(...weights)
+    const words = e.name.toLowerCase().split(/[^a-z]+/).filter((w) => w.length >= 4 && !['press', 'dumbbell', 'barbell', 'incline'].includes(w))
+    if (!words.length) continue
+    for (const g of d.goals) {
+      if (g.done || !(g.measure?.mode === 'level' && g.measure.unit === 'kg')) continue
+      const title = g.title.toLowerCase()
+      if (!words.some((w) => title.includes(w))) continue
+      for (const st of g.steps) {
+        if (st.done) continue
+        const m = st.text.match(/(\d+(?:[.,]\d+)?)\s*kg/i)
+        if (m && max >= parseFloat(m[1].replace(',', '.'))) {
+          st.done = true
+          st.doneAt = date
+          st.fromWorkout = true
+        }
+      }
+    }
+  }
+}
+
+// Planned sessions get ticked when Garmin logged a matching activity
+function autoCompleteTraining(d, g, start, end) {
+  const t = d.training
+  if (!t?.sessions?.length) return
+  for (let day = start; day <= end; day = addDaysLocal(day, 1)) {
+    const wd = (new Date(day + 'T12:00').getDay() + 6) % 7
+    for (const sid of t.days[wd] || []) {
+      if (t.createdAt && day < t.createdAt) continue
+      const s = t.sessions.find((x) => x.id === sid)
+      const kind = s && SPORTS[s.sport]?.garmin
+      if (!kind) continue
+      const existing = t.logs[day]?.[sid]
+      if (existing?.done || existing?.source === 'manual') continue
+      const mins = g.activities.filter((a) => a.date === day && a.kind === kind).reduce((n, a) => n + a.minutes, 0)
+      const needed = s.sport === 'gym' ? 15 : Math.max(15, s.minutes * 0.5)
+      if (mins >= needed) {
+        t.logs[day] ??= {}
+        t.logs[day][sid] = { ...(existing || { sets: {} }), done: true, source: 'garmin' }
+      }
+    }
+  }
+}
 
 // status: 'loading' | 'saved' | 'saving' | 'offline'
 export function useStore(user) {
@@ -372,6 +424,63 @@ export function useStore(user) {
         }
         g.auto = Object.fromEntries(Object.entries(g.auto).filter(([day]) => day >= cutoff))
         d.garmin = g
+        autoCompleteTraining(d, g, start, end)
+      })
+    },
+
+    // ── Training ──
+    setTraining(t) {
+      update((d) => {
+        if (!t) return void (d.training = emptyTraining())
+        const logs = { ...(d.training?.logs || {}), ...(t.logs || {}) }
+        const usedIds = new Set(Object.values(logs).flatMap((l) => Object.keys(l)))
+        // sessions with workout history stay (archived) so progress tracking keeps working
+        const keep = (d.training?.sessions || []).filter((s) => usedIds.has(s.id) && !t.sessions.some((x) => x.id === s.id)).map((s) => ({ ...s, archived: true }))
+        d.training = { ...t, sessions: [...t.sessions, ...keep], logs }
+      })
+    },
+    clearTrainingPlan() {
+      update((d) => {
+        d.training = { ...emptyTraining(), logs: d.training?.logs || {}, sessions: (d.training?.sessions || []).map((s) => ({ ...s, archived: true })) }
+      })
+    },
+    saveTrainingSession(session) {
+      update((d) => {
+        d.training ??= emptyTraining()
+        const i = d.training.sessions.findIndex((s) => s.id === session.id)
+        if (i >= 0) d.training.sessions[i] = session
+        else d.training.sessions.push(session)
+      })
+    },
+    deleteTrainingSession(id) {
+      update((d) => {
+        d.training.days = d.training.days.map((ids) => ids.filter((x) => x !== id))
+        const used = Object.values(d.training.logs).some((l) => l[id])
+        if (used) d.training.sessions = d.training.sessions.map((s) => (s.id === id ? { ...s, archived: true } : s))
+        else d.training.sessions = d.training.sessions.filter((s) => s.id !== id)
+      })
+    },
+    setTrainingDay(dayIndex, ids) {
+      update((d) => {
+        d.training ??= emptyTraining()
+        d.training.days[dayIndex] = ids
+      })
+    },
+    logSets(date, sessionId, exerciseId, sets) {
+      update((d) => {
+        const t = d.training
+        t.logs[date] ??= {}
+        t.logs[date][sessionId] ??= { done: false, source: 'manual', sets: {} }
+        t.logs[date][sessionId].sets[exerciseId] = sets
+        const session = t.sessions.find((s) => s.id === sessionId)
+        if (session) linkLiftsToGoals(d, session, t.logs[date][sessionId], date)
+      })
+    },
+    markSession(date, sessionId, done) {
+      update((d) => {
+        const t = d.training
+        t.logs[date] ??= {}
+        t.logs[date][sessionId] = { sets: {}, ...(t.logs[date][sessionId] || {}), done, source: 'manual' }
       })
     },
 

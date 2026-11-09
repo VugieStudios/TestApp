@@ -2,6 +2,7 @@ import { addDays, addMonths, fmtMinutes, lastDays, monthEnd, monthKey, monthStar
 import { active, dayCompletion, isDone, isScheduled, weekCount } from './habits.js'
 import { hasJournal } from './game.js'
 import { garminRange } from './garmin.js'
+import { adherence } from './training.js'
 
 // ── Per-day numbers ──────────────────────────────────────────────────────────
 // Day score (0–1): mostly habits, plus focus time and moving goals/tasks forward.
@@ -314,6 +315,8 @@ export function review(data, game, period) {
   }
   if (cur.focus) lines.push(`You focused for ${fmtMinutes(cur.focus)}${prev.focus ? ` (last ${noun}: ${fmtMinutes(prev.focus)})` : ''}.`)
   if (cur.steps || cur.goalsDone) lines.push(`You finished ${cur.steps} micro-goal${cur.steps === 1 ? '' : 's'}${cur.goalsDone ? ` and achieved ${cur.goalsDone} goal${cur.goalsDone === 1 ? '' : 's'} 🏆` : ''}.`)
+  const tr = adherence(data, period.start, period.end)
+  if (tr?.planned) lines.push(`Training: ${tr.done} of ${tr.planned} planned workouts done${tr.done === tr.planned ? ' 💪' : ''}.`)
   const gc = garminRange(data.garmin, period.start, period.end)
   const gp = garminRange(data.garmin, prevP.start, prevP.end)
   if (gc && (gc.activities || gc.avgSleepMin)) {
