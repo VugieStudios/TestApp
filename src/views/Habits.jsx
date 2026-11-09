@@ -155,7 +155,7 @@ function HabitCard({ data, actions, h }) {
   )
 }
 
-export default function Habits({ data, actions }) {
+export default function Habits({ data, actions, embedded }) {
   const [adding, setAdding] = useState(false)
   const active = data.habits.filter((h) => !h.archived)
   const paused = data.habits.filter((h) => h.archived)
@@ -163,7 +163,7 @@ export default function Habits({ data, actions }) {
   return (
     <div className="stack">
       <header className="page-head">
-        <h1>Habits</h1>
+        {embedded ? <p className="muted small">Daily routines, streaks and freezes</p> : <h1>Habits</h1>}
         {!adding && <button className="primary" onClick={() => setAdding(true)}>+ New habit</button>}
       </header>
 

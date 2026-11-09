@@ -32,17 +32,11 @@ const LEGACY_KEY = 'grow-data-v1'
 const cacheKey = (userId) => `grow-cache-${userId}`
 
 export const DEFAULT_DASHBOARD = [
-  'player',
-  'quests',
-  'habits',
-  'training',
-  'garmin',
-  'micro',
+  'summary',
+  'agenda',
   'focus',
-  'tasks',
-  'journal',
-  'dump',
-  'insights',
+  'reflect',
+  'insight',
 ].map((id) => ({ id, hidden: false }))
 
 export const DEFAULT_SETTINGS = {

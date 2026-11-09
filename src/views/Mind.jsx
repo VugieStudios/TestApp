@@ -77,11 +77,11 @@ function History({ data }) {
 }
 
 export default function Mind(props) {
-  const [tab, setTab] = useState('now')
+  const [tab, setTab] = useState({ journal: 'now', inbox: 'inbox', history: 'history' }[props.sub] || 'now')
   return (
     <div className="stack">
       <header className="page-head"><h1>Mind</h1></header>
-      <Seg value={tab} onChange={setTab} options={[['now', 'Today'], ['inbox', 'Dump & tasks'], ['history', 'Journal history']]} />
+      <Seg value={tab} onChange={setTab} options={[['now', '✎ Journal'], ['inbox', '🌀 Inbox & tasks'], ['history', 'History']]} />
       {tab === 'now' && (
         <>
           <JournalWidget {...props} />

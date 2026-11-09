@@ -47,9 +47,9 @@ export function Sheet({ open, onClose, title, children }) {
   )
 }
 
-export function Seg({ value, options, onChange, small }) {
+export function Seg({ value, options, onChange, small, scroll }) {
   return (
-    <div className={`seg ${small ? 'small' : ''}`}>
+    <div className={`seg ${small ? 'small' : ''} ${scroll ? 'scroll' : ''}`}>
       {options.map(([v, label]) => (
         <button key={String(v)} type="button" className={value === v ? 'on' : ''} onClick={() => onChange(v)}>
           {label}

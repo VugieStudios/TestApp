@@ -258,7 +258,7 @@ function GoalCard({ g, actions, ui }) {
   )
 }
 
-export default function Goals({ data, actions, ui }) {
+export default function Goals({ data, actions, ui, embedded }) {
   const [adding, setAdding] = useState(data.goals.length === 0)
   const [filter, setFilter] = useState('all')
   const list = data.goals.filter((g) => !g.done && (filter === 'all' || g.horizon === filter))
@@ -267,7 +267,7 @@ export default function Goals({ data, actions, ui }) {
   return (
     <div className="stack">
       <header className="page-head">
-        <h1>Goals</h1>
+        {embedded ? <p className="muted small">Big goals, broken into daily micro-goals</p> : <h1>Goals</h1>}
         {!adding && <button className="primary" onClick={() => setAdding(true)}>+ New goal</button>}
       </header>
       {adding && <NewGoal actions={actions} onClose={() => setAdding(false)} />}

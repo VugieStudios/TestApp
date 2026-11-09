@@ -283,7 +283,7 @@ function Progress({ data }) {
 
 // ── Page ────────────────────────────────────────────────────────────────────
 
-export default function Train({ data, actions, ui }) {
+export default function Train({ data, actions, ui, embedded }) {
   const [tab, setTab] = useState('week')
   const [setup, setSetup] = useState(false)
   const [editing, setEditing] = useState(null) // session being edited
@@ -294,7 +294,7 @@ export default function Train({ data, actions, ui }) {
   if (!hasPlan(data) && !data.training?.sports?.length || setup) {
     return (
       <div className="stack">
-        <header className="page-head"><h1>Train</h1></header>
+        {!embedded && <header className="page-head"><h1>Train</h1></header>}
         <Setup data={data} actions={actions} onDone={() => setSetup(false)} onCancel={hasPlan(data) ? () => setSetup(false) : null} />
         <p className="muted small center">Grow can’t send workouts to your Garmin watch (Garmin only allows reading), but sessions tick themselves off when your watch logs a matching ride, run or strength workout.</p>
       </div>
@@ -309,12 +309,12 @@ export default function Train({ data, actions, ui }) {
     <div className="stack">
       <header className="page-head">
         <div>
-          <h1>Train</h1>
+          {!embedded && <h1>Train</h1>}
           <p className="muted small">{planned} sessions per week{wk?.planned ? ` · ${wk.done}/${wk.planned} done so far this week` : ''}</p>
         </div>
         <button className="ghost small" onClick={() => window.confirm('Generate a new scheme? Your workout history is kept.') && setSetup(true)}>New scheme</button>
       </header>
-      <Seg value={tab} onChange={setTab} options={[['week', 'This week'], ['sessions', 'Sessions'], ['progress', 'Progress']]} />
+      <Seg small value={tab} onChange={setTab} options={[['week', 'This week'], ['sessions', 'Sessions'], ['progress', 'Progress']]} />
 
       {tab === 'week' && (
         <Card

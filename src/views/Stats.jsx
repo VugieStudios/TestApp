@@ -4,6 +4,7 @@ import { addDays, addMonths, fmtMinutes, monthEnd, monthKey, monthStart, prettyD
 import { dayStats, EXAMPLE_INSIGHTS, insights, MIN_DAYS, periodFor, review, shiftPeriod } from '../lib/analytics.js'
 import { XP } from '../lib/game.js'
 import { BodyStats } from '../components/garmin.jsx'
+import { Achievements } from '../components/achievements.jsx'
 
 const METRICS = [
   ['score', 'Day score'],
@@ -229,7 +230,7 @@ function Reviews({ data, actions, game }) {
 }
 
 export default function Stats(props) {
-  const [tab, setTab] = useState(props.sub || 'calendar')
+  const [tab, setTab] = useState(props.sub || 'insights')
   const pending = useMemo(() => {
     const w = periodFor('week', addDays(todayKey(), -7))
     const m = periodFor('month', monthStart(addMonths(monthKey(todayKey()), -1)))
@@ -237,12 +238,24 @@ export default function Stats(props) {
   }, [props.data.reviews])
   return (
     <div className="stack">
-      <header className="page-head"><h1>Stats</h1></header>
-      <Seg value={tab} onChange={setTab} options={[['calendar', 'Calendar'], ['insights', 'Insights'], ['reviews', `Reviews${pending ? ` (${pending})` : ''}`], ...(props.data.garmin?.enabled ? [['body', 'Body']] : [])]} />
+      <header className="page-head"><h1>Progress</h1></header>
+      <Seg
+        scroll
+        value={tab}
+        onChange={setTab}
+        options={[
+          ['insights', 'Insights'],
+          ['reviews', `Reviews${pending ? ` (${pending})` : ''}`],
+          ['calendar', 'Calendar'],
+          ...(props.data.garmin?.enabled ? [['body', 'Body']] : []),
+          ['achievements', 'Level & badges'],
+        ]}
+      />
       {tab === 'calendar' && <Calendar {...props} />}
       {tab === 'insights' && <Insights {...props} />}
       {tab === 'reviews' && <Reviews {...props} />}
       {tab === 'body' && <BodyStats {...props} />}
+      {tab === 'achievements' && <Achievements {...props} />}
     </div>
   )
 }

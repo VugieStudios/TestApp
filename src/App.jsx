@@ -10,24 +10,29 @@ import { BadgeToast, Kickstart, LevelUp, XpFloats } from './components/game.jsx'
 import { Sheet } from './components/ui.jsx'
 import Login from './views/Login.jsx'
 import Today from './views/Today.jsx'
-import Habits from './views/Habits.jsx'
-import Goals from './views/Goals.jsx'
+import Plan from './views/Plan.jsx'
 import Mind from './views/Mind.jsx'
 import Stats from './views/Stats.jsx'
-import Profile from './views/Profile.jsx'
-import Train from './views/Train.jsx'
+import Settings from './views/Settings.jsx'
 import { WorkoutLogger } from './components/workout.jsx'
 import { sessionById } from './lib/training.js'
 
 const TABS = [
   { id: 'today', label: 'Today', icon: '◉' },
-  { id: 'habits', label: 'Habits', icon: '↻' },
-  { id: 'train', label: 'Train', icon: '⚡' },
-  { id: 'goals', label: 'Goals', icon: '◎' },
+  { id: 'plan', label: 'Plan', icon: '☰' },
   { id: 'mind', label: 'Mind', icon: '✎' },
-  { id: 'stats', label: 'Stats', icon: '▦' },
+  { id: 'progress', label: 'Progress', icon: '▦' },
 ]
-const VIEWS = { today: Today, habits: Habits, train: Train, goals: Goals, mind: Mind, stats: Stats, profile: Profile }
+const VIEWS = { today: Today, plan: Plan, mind: Mind, progress: Stats, settings: Settings }
+
+// Old screen names still work everywhere in the app
+const ALIASES = {
+  habits: ['plan', 'habits'],
+  train: ['plan', 'training'],
+  goals: ['plan', 'goals'],
+  stats: ['progress', null],
+  profile: ['settings', null],
+}
 
 const STATUS = { loading: 'Loading…', saving: 'Saving…', saved: 'Saved', offline: 'Not synced' }
 
@@ -79,9 +84,10 @@ function Shell({ data, actions, status }) {
   const timer = useTimer()
   const game = useMemo(() => computeGame(data), [data])
 
-  const goTo = (t, subTab = null) => {
+  const goTo = (target, subTab = null) => {
+    const [t, defSub] = ALIASES[target] || [target, null]
     setTab(t)
-    setSub(subTab)
+    setSub(subTab || defSub)
     window.scrollTo({ top: 0 })
   }
   const garmin = useGarminSync(data, actions)
@@ -172,7 +178,7 @@ function Shell({ data, actions, status }) {
   return (
     <div className={`app ${low ? 'is-low' : ''}`}>
       <header className="topbar">
-        <button className="me" onClick={() => goTo('profile')} aria-label="Profile">
+        <button className="me" onClick={() => goTo('progress', 'achievements')} aria-label="Level and badges">
           <span className="me-lvl">{game.level}</span>
           <span className="me-bar"><i style={{ width: `${game.progress * 100}%` }} /></span>
         </button>
@@ -183,9 +189,10 @@ function Shell({ data, actions, status }) {
         </nav>
         <div className="row tight">
           <TimerPill onClick={() => goTo('today')} />
-          <span className={`sync ${status}`} title={status === 'offline' ? 'Saved on this device; will sync when back online' : ''}>
+          <span className={`sync ${status}`} title={status === 'offline' ? 'Saved on this device; will sync when back online' : STATUS[status]}>
             <i />{STATUS[status]}
           </span>
+          <button className={`icon-btn gear ${tab === 'settings' ? 'on' : ''}`} onClick={() => goTo('settings')} aria-label="Settings">⚙</button>
         </div>
       </header>
 
