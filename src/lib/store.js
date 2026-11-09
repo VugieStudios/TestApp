@@ -13,7 +13,7 @@ import { supabase } from './supabase.js'
 //              steps: [{ id, text, done, doneAt, plannedFor, minutes }] }]
 // tasks:    [{ id, text, done, doneAt, createdAt, fromDump }]
 // dumps:    [{ id, text, createdAt, processed }]
-// entries:  { 'YYYY-MM-DD': { mood, energy, win, drain, gratitude, deep, notes } }
+// entries:  { 'YYYY-MM-DD': { win, drain, gratitude, deep, notes } }
 // focus:    [{ id, date, minutes, label, targetType, targetId }]
 // kicks:    [{ id, date, label }]          1-minute rule starts
 // lowEnergy:{ 'YYYY-MM-DD': true }
@@ -33,7 +33,6 @@ export const DEFAULT_DASHBOARD = [
   'micro',
   'focus',
   'tasks',
-  'checkin',
   'journal',
   'dump',
   'grid',
@@ -331,6 +330,16 @@ export function useStore(user) {
     },
     replaceAll(newData) {
       setData(migrate(newData))
+    },
+    // Wipe everything and start with a clean slate (login stays the same)
+    resetAll() {
+      try {
+        localStorage.removeItem('grow-timer')
+        localStorage.removeItem(LEGACY_KEY)
+      } catch {
+        /* ignore */
+      }
+      setData({ ...freshData(), habits: [] })
     },
   }
 

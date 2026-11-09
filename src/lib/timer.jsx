@@ -95,6 +95,9 @@ export function TimerProvider({ settings, onWorkDone, children }) {
     reset() {
       setT({ ...IDLE, target: t.target })
     },
+    clear() {
+      setT(IDLE)
+    },
     // stop early but keep the minutes you did
     stopAndLog() {
       const done = Math.floor((total - remaining) / 60000)

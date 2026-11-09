@@ -203,41 +203,6 @@ export function TasksWidget({ data, actions, ui }) {
   )
 }
 
-// ── Mood & energy check-in ──
-const MOODS = ['😞', '😕', '😐', '🙂', '😄']
-const ENERGY = ['▁', '▃', '▅', '▆', '█']
-
-export function Scale({ value, onChange, labels, kind }) {
-  return (
-    <div className={`scale ${kind}`}>
-      {labels.map((l, i) => (
-        <button key={i} type="button" className={value === i + 1 ? 'on' : ''} onClick={() => onChange(value === i + 1 ? null : i + 1)} aria-label={`${i + 1} of 5`}>
-          {l}
-        </button>
-      ))}
-    </div>
-  )
-}
-
-export function CheckinWidget({ data, actions }) {
-  const today = todayKey()
-  const e = data.entries[today] || {}
-  return (
-    <Card title="Check-in" icon="◐" right={<XpChip n={XP.checkin} done={!!(e.mood || e.energy)} />}>
-      <div className="checkin">
-        <div>
-          <span className="label">Mood</span>
-          <Scale kind="mood" value={e.mood} labels={MOODS} onChange={(v) => actions.saveEntry(today, { mood: v })} />
-        </div>
-        <div>
-          <span className="label">Energy</span>
-          <Scale kind="energy" value={e.energy} labels={ENERGY} onChange={(v) => actions.saveEntry(today, { energy: v })} />
-        </div>
-      </div>
-    </Card>
-  )
-}
-
 // ── Guided journal ──
 const DEEP_PROMPTS = [
   'What would make tomorrow 1% better?',
@@ -329,7 +294,7 @@ export function GridWidget({ data, ui }) {
           return <div key={d} className={`cell ${d === today ? 'today' : ''} ${s?.low ? 'low' : ''}`} style={{ '--v': s?.score ?? -1 }} title={shortDate(d)} />
         })}
       </div>
-      <p className="muted small">Score = habits + mood + energy. Brighter is better.</p>
+      <p className="muted small">Score = habits + focus + progress. Brighter is better.</p>
     </Card>
   )
 }
@@ -341,7 +306,7 @@ export function InsightsWidget({ data, ui }) {
     <Card title="Insights" icon="✦" right={<button className="link small" onClick={() => ui.goTo('stats')}>More →</button>}>
       {!ins.ready ? (
         <>
-          <p className="muted">Insights unlock after {MIN_DAYS} days of check-ins.</p>
+          <p className="muted">Insights unlock after {MIN_DAYS} days of tracking habits.</p>
           <div className="progress"><div style={{ width: `${(ins.have / MIN_DAYS) * 100}%` }} /></div>
           <p className="muted small">{ins.have}/{MIN_DAYS} days</p>
         </>
@@ -366,16 +331,15 @@ export const WIDGETS = {
   micro: { name: 'Micro-goals', component: MicroWidget, low: true },
   focus: { name: 'Focus timer', component: FocusWidget },
   tasks: { name: 'Tasks', component: TasksWidget },
-  checkin: { name: 'Mood & energy check-in', component: CheckinWidget, low: true },
-  journal: { name: 'Journal', component: JournalWidget },
+  journal: { name: 'Journal', component: JournalWidget, low: true },
   dump: { name: 'Brain dump', component: DumpWidget, low: true },
   grid: { name: 'Day quality grid', component: GridWidget },
   insights: { name: 'Insights', component: InsightsWidget },
 }
 
 export const PRESETS = {
-  Balanced: ['player', 'quests', 'habits', 'micro', 'focus', 'tasks', 'checkin', 'journal', 'dump', 'grid', 'insights'],
-  'Deep work': ['focus', 'micro', 'tasks', 'habits', 'quests', 'dump', 'player', 'checkin', 'journal', 'grid', 'insights'],
-  Wellbeing: ['checkin', 'journal', 'dump', 'habits', 'quests', 'grid', 'insights', 'player', 'micro', 'focus', 'tasks'],
+  Balanced: ['player', 'quests', 'habits', 'micro', 'focus', 'tasks', 'journal', 'dump', 'grid', 'insights'],
+  'Deep work': ['focus', 'micro', 'tasks', 'habits', 'quests', 'dump', 'player', 'journal', 'grid', 'insights'],
+  Wellbeing: ['journal', 'dump', 'habits', 'quests', 'grid', 'insights', 'player', 'micro', 'focus', 'tasks'],
 }
 

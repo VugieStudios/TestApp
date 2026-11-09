@@ -117,43 +117,95 @@ const TEMPLATES = {
   ],
 }
 
-const UNIT = /(€\s?)?(\d+(?:[.,]\d+)?)\s*(k\b|km|kilomet\w*|books?|pages?|kg|euros?|eur|€|hours?|hrs?|lessons?|videos?|workouts?|sessions?|times|chapters?|words?|push.?ups?|posts?|clients?)/i
+const UNIT = /(€\s?)?(\d+(?:[.,]\d+)?)\s*(k\b|km|kilomet\w*|books?|pages?|kgs?|kilos?|watts?|w\b|euros?|eur|€|hours?|hrs?|minutes?|min\b|lessons?|videos?|workouts?|sessions?|times|reps|chapters?|words?|push.?ups?|pull.?ups?|posts?|clients?|subscribers?|followers?)/i
+
+const UNIT_ALIASES = { kgs: 'kg', kilo: 'kg', kilos: 'kg', w: 'W', watt: 'W', watts: 'W', min: 'min', minute: 'min', minutes: 'min', hrs: 'hours', hr: 'hours', kilometer: 'km', kilometers: 'km', kilometre: 'km', kilometres: 'km' }
 
 export function parseMeasurable(title) {
   const euro = title.match(/€\s?(\d+(?:[.,]\d+)?)/)
   if (euro) return { amount: parseFloat(euro[1].replace(',', '.')), unit: '€' }
   const m = title.match(UNIT)
   if (!m) return null
-  let amount = parseFloat(m[2].replace(',', '.'))
+  const amount = parseFloat(m[2].replace(',', '.'))
   let unit = m[3].toLowerCase()
   if (m[1] || unit === 'eur' || unit.startsWith('euro')) unit = '€'
-  if (unit === 'k') return null
-  if (!amount || amount < 2) return null
+  unit = UNIT_ALIASES[unit] || unit
+  if (unit === 'k' || !amount || amount < 2) return null
   return { amount, unit }
 }
 
-const round = (n) => (n >= 10 ? Math.round(n) : Math.round(n * 10) / 10)
-const fmt = (n, unit) => (unit === '€' ? `€${round(n)}` : `${round(n)} ${round(n) === 1 && unit.endsWith('s') ? unit.slice(0, -1) : unit}`)
-const VERBS = { '€': 'Save', km: 'Ride', books: 'Read', book: 'Read', pages: 'Read', page: 'Read' }
+// "Level" goals: reach a number once (bench 65 kg, FTP 300 W, run 10 km).
+// "Total" goals: add up to a number over time (ride 500 km in December, read 12 books).
+export function guessMode(title, unit) {
+  if (['kg', 'W', 'reps', 'push-ups', 'pushups', 'pull-ups', 'pullups', 'subscribers', 'followers'].includes(unit)) return 'level'
+  if (/bench|squat|deadlift|lift|press|ftp|weigh|max\b|pr\b|personal best/i.test(title)) return 'level'
+  if (unit === 'km' && !/\b(in|this|per|by|every|each|total)\b/i.test(title) && /\brun\b|\bswim\b/i.test(title)) return 'level'
+  return 'total'
+}
 
-export function breakdown({ title, category, deadline, horizon }) {
+const STEP_SIZE = { kg: 2.5, W: 5, km: 1, min: 1, reps: 1, 'push-ups': 1, pushups: 1, 'pull-ups': 1, pullups: 1 }
+const WHOLE = ['book', 'books', 'times', 'clients', 'posts', 'videos', 'lessons', 'sessions', 'workouts', 'reps', 'subscribers', 'followers', 'chapters']
+
+const round = (n) => (n >= 10 ? Math.round(n * 2) / 2 : Math.round(n * 10) / 10)
+const fmt = (n, unit) => (unit === '€' ? `€${round(n)}` : `${round(n)} ${round(n) === 1 && unit.endsWith('s') ? unit.slice(0, -1) : unit}`)
+const VERBS = { '€': 'Save', km: 'Ride', books: 'Read', book: 'Read', pages: 'Read', kg: 'Lift', W: 'Hold' }
+
+// The word right before the number: "I want to bench 65kg" -> "Bench"
+function verbFor(title, unit) {
+  const m = title.match(/([a-z]+)\s+(?:€\s?)?\d/i)
+  const skip = /^(to|of|a|an|the|my|i|want|be|get|in|at|for|under|than|least|about)$/i
+  if (m && !skip.test(m[1])) return m[1] === m[1].toUpperCase() ? m[1] : m[1][0].toUpperCase() + m[1].slice(1).toLowerCase()
+  return VERBS[unit] || 'Reach'
+}
+
+export function measurableSteps(title, measure, days) {
+  const { amount, unit, mode } = measure
+  const start = measure.start === '' || measure.start === null || measure.start === undefined ? null : Number(measure.start)
+  const verb = verbFor(title, unit)
+  const weeks = Math.min(Math.max(2, Math.round(days / 7)), 20)
+
+  if (mode === 'level') {
+    const steps = []
+    let from = start
+    if (from === null) {
+      steps.push([`Test where you are now: your current max (${unit})`, 30])
+      const inc0 = STEP_SIZE[unit] || 1
+      from = Math.round((amount * 0.6) / inc0) * inc0
+    }
+    const gap = amount - from
+    if (gap <= 0) return [[`You're already at ${fmt(from, unit)}: test ${fmt(amount, unit)} to confirm 🎯`, 30]]
+    const inc = STEP_SIZE[unit] || (WHOLE.includes(unit) ? 1 : gap / weeks)
+    const n = Math.max(1, Math.min(12, Math.ceil(gap / inc))) // realistic increments, max 12 steps
+    const per = Math.ceil(gap / n / inc) * inc
+    for (let i = 1; i <= n; i++) {
+      const v = Math.min(amount, from + per * i)
+      steps.push([v >= amount ? `${verb} ${fmt(amount, unit)} 🎯` : `${verb} ${fmt(v, unit)}`, 45])
+      if (v >= amount) break
+    }
+    return steps
+  }
+
+  // total
+  const done = start || 0
+  const left = amount - done
+  if (left <= 0) return [[`You've already done ${fmt(done, unit)}. Goal reached 🎯`, 5]]
+  const chunks = WHOLE.includes(unit) ? Math.max(1, Math.min(weeks, left)) : weeks
+  const per = left / chunks
+  const steps = [['Plan when you’ll work on it this week', 10]]
+  for (let i = 1; i <= chunks; i++) {
+    const cum = i === chunks ? amount : done + per * i
+    steps.push([`${verb} ${fmt(per, unit)} · ${unit === '€' ? `€${round(cum)}` : round(cum)}/${fmt(amount, unit)} total`, 30])
+  }
+  return steps
+}
+
+export function breakdown({ title, category, deadline, horizon, measure }) {
   const today = todayKey()
   const days = deadline ? Math.max(1, daysBetween(today, deadline)) : horizon === 'long' ? 90 : 21
-  const measurable = parseMeasurable(title)
 
   let steps
-  if (measurable) {
-    let chunks = Math.min(Math.max(2, Math.round(days / 7)), 16) // about one chunk per week
-    if (['book', 'books', 'times', 'clients', 'posts', 'videos', 'lessons'].includes(measurable.unit)) chunks = Math.min(chunks, measurable.amount) // no half books
-    const per = measurable.amount / chunks
-    const first = title.trim().split(/\s+/)[0]
-    const verb = /^[a-z]+$/i.test(first) && !/^\d/.test(first) ? first[0].toUpperCase() + first.slice(1).toLowerCase() : VERBS[measurable.unit] || 'Do'
-    const u = measurable.unit
-    steps = [['Plan when you’ll work on it this week', 10]]
-    for (let i = 1; i <= chunks; i++) {
-      const total = i === chunks ? measurable.amount : per * i
-      steps.push([`${verb} ${fmt(per, u)} · ${u === '€' ? `€${round(total)}` : round(total)}/${fmt(measurable.amount, u)} total`, 30])
-    }
+  if (measure) {
+    steps = measurableSteps(title, measure, days)
   } else {
     steps = TEMPLATES[category] || TEMPLATES.general
     if (horizon === 'long' && days > 60) {

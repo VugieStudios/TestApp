@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Card, Seg } from '../components/ui.jsx'
-import { DumpWidget, JournalWidget, CheckinWidget, TasksWidget, JOURNAL_PROMPTS } from '../widgets/index.jsx'
+import { DumpWidget, JournalWidget, TasksWidget, JOURNAL_PROMPTS } from '../widgets/index.jsx'
 import { prettyDate } from '../lib/dates.js'
 
 function Inbox({ data, actions }) {
@@ -65,7 +65,6 @@ function History({ data }) {
           <article key={d} className="card">
             <div className="card-head">
               <h2>{prettyDate(d, { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' })}</h2>
-              <span className="muted small">{e.mood ? `mood ${e.mood}/5` : ''} {e.energy ? `· energy ${e.energy}/5` : ''}</span>
             </div>
             {fields.filter((f) => e[f.key]?.trim()).map((f) => (
               <p key={f.key} className="entry"><span className="label">{f.label}</span>{e[f.key]}</p>
@@ -85,7 +84,6 @@ export default function Mind(props) {
       <Seg value={tab} onChange={setTab} options={[['now', 'Today'], ['inbox', 'Dump & tasks'], ['history', 'Journal history']]} />
       {tab === 'now' && (
         <>
-          <CheckinWidget {...props} />
           <JournalWidget {...props} />
           <DumpWidget {...props} />
         </>

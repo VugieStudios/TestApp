@@ -12,7 +12,6 @@ export const XP = {
   goal: 100,
   task: 5,
   journal: 15,
-  checkin: 5,
   focusMinute: 1,
   focusSession: 10,
   kick: 5,
@@ -26,7 +25,6 @@ export const XP = {
 
 const JOURNAL_FIELDS = ['win', 'drain', 'gratitude', 'deep', 'notes', 'improve']
 export const hasJournal = (e) => !!e && JOURNAL_FIELDS.some((k) => e[k]?.trim())
-export const hasCheckin = (e) => !!e && (e.mood || e.energy)
 
 export const RANKS = [
   { level: 1, name: 'Novice' },
@@ -62,7 +60,7 @@ function questState(data, day) {
     data.focus.some((f) => f.date === day && f.minutes >= 15) ||
     data.tasks.some((t) => t.done && t.doneAt === day)
   const entry = data.entries[day]
-  const reflect = low ? hasCheckin(entry) || hasJournal(entry) : hasJournal(entry)
+  const reflect = hasJournal(entry)
   return { low, habits, habitsDone, allHabits: habits.length > 0 && habitsDone === habits.length, progress, reflect }
 }
 
@@ -71,7 +69,7 @@ export function questsFor(data, day = todayKey()) {
   const list = [
     { id: 'habits', text: q.low ? 'Do your core habits' : 'Complete today’s habits', done: q.allHabits, xp: XP.completeDay, progress: `${q.habitsDone}/${q.habits.length}` },
     { id: 'progress', text: 'Move a goal forward (micro-goal, task or 15 min focus)', done: q.progress, xp: XP.step },
-    { id: 'reflect', text: q.low ? 'Quick check-in: how are you?' : 'Reflect in your journal', done: q.reflect, xp: XP.journal },
+    { id: 'reflect', text: q.low ? 'Write one line: how was today?' : 'Reflect in your journal', done: q.reflect, xp: XP.journal },
   ]
   if (q.low) list.splice(1, 1) // low energy: no pressure to make progress
   return { list, allDone: list.every((x) => x.done), low: q.low }
@@ -95,7 +93,6 @@ export function xpByDay(data) {
   data.tasks.forEach((t) => t.done && add(t.doneAt, XP.task))
   for (const [day, e] of Object.entries(data.entries)) {
     if (hasJournal(e)) add(day, XP.journal)
-    if (hasCheckin(e)) add(day, XP.checkin)
   }
   data.focus.forEach((f) => add(f.date, f.minutes * XP.focusMinute + (f.minutes >= 20 ? XP.focusSession : 0)))
   data.kicks.forEach((k) => add(k.date, XP.kick))
@@ -144,7 +141,6 @@ export function computeGame(data) {
     focusSessions: data.focus.filter((f) => f.minutes >= 20).length,
     kicks: data.kicks.length,
     journals: Object.values(data.entries).filter(hasJournal).length,
-    checkins: Object.values(data.entries).filter(hasCheckin).length,
     reviews: Object.keys(data.reviews).length,
     dumps: data.dumps.length,
     lowDays: Object.keys(data.lowEnergy).length,

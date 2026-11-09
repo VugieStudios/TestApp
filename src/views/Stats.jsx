@@ -6,16 +6,16 @@ import { XP } from '../lib/game.js'
 
 const METRICS = [
   ['score', 'Day score'],
-  ['mood', 'Mood'],
-  ['energy', 'Energy'],
   ['completion', 'Habits'],
+  ['focus', 'Focus'],
 ]
 
 function norm(s, metric) {
   if (!s) return -1
   const v = s[metric]
   if (v === null || v === undefined) return -1
-  return metric === 'mood' || metric === 'energy' ? (v - 1) / 4 : v
+  if (metric === 'focus') return v > 0 ? Math.min(1, v / 50) : -1
+  return v
 }
 
 function Calendar({ data }) {
@@ -59,9 +59,9 @@ function Calendar({ data }) {
           <b>{prettyDate(picked)}</b>
           <div className="stat-row">
             <span>Habits <b>{p.completion === null ? '–' : `${Math.round(p.completion * 100)}%`}</b></span>
-            <span>Mood <b>{p.mood ?? '–'}</b></span>
-            <span>Energy <b>{p.energy ?? '–'}</b></span>
-            <span>Focus <b>{p.focus}m</b></span>
+            <span>Focus <b>{fmtMinutes(p.focus)}</b></span>
+            <span>Steps & tasks <b>{p.progress}</b></span>
+            <span>Journal <b>{p.journaled ? '✓' : '–'}</b></span>
           </div>
           {data.entries[picked]?.win && <p className="muted small">Win: {data.entries[picked].win}</p>}
         </div>
@@ -71,7 +71,7 @@ function Calendar({ data }) {
 }
 
 function Trend({ data }) {
-  // 8-week trend of average energy, mood and habit completion
+  // 8-week trend: habit completion, focus time and journaling
   const weeks = Array.from({ length: 8 }, (_, i) => addDays(weekStart(todayKey()), -7 * (7 - i)))
   const rows = weeks.map((w) => {
     const s = range(w, addDays(w, 6)).filter((d) => d <= todayKey()).map((d) => dayStats(data, d))
@@ -79,7 +79,12 @@ function Trend({ data }) {
       const v = s.map((x) => x[k]).filter((x) => x !== null)
       return v.length ? f(v.reduce((p, c) => p + c, 0) / v.length) : null
     }
-    return { w, energy: a('energy', (v) => (v - 1) / 4), mood: a('mood', (v) => (v - 1) / 4), completion: a('completion') }
+    return {
+      w,
+      completion: a('completion'),
+      focus: s.length ? Math.min(1, s.reduce((n, x) => n + x.focus, 0) / s.length / 50) : null,
+      journal: s.length ? s.filter((x) => x.journaled).length / s.length : null,
+    }
   })
   const W = 320
   const H = 110
@@ -91,13 +96,13 @@ function Trend({ data }) {
       <svg viewBox={`0 0 ${W} ${H}`} className="trend">
         {[0, 0.5, 1].map((v) => <line key={v} x1="10" x2={W - 10} y1={y(v)} y2={y(v)} />)}
         <polyline className="t-comp" points={path('completion')} />
-        <polyline className="t-energy" points={path('energy')} />
-        <polyline className="t-mood" points={path('mood')} />
+        <polyline className="t-focus" points={path('focus')} />
+        <polyline className="t-journal" points={path('journal')} />
       </svg>
       <div className="legend">
         <span><i className="l-comp" /> Habits</span>
-        <span><i className="l-energy" /> Energy</span>
-        <span><i className="l-mood" /> Mood</span>
+        <span><i className="l-focus" /> Focus</span>
+        <span><i className="l-journal" /> Journaling</span>
         <span className="muted small">{shortDate(weeks[0])} → now</span>
       </div>
     </Card>
@@ -111,7 +116,7 @@ function Insights({ data }) {
       <Trend data={data} />
       {!ins.ready ? (
         <Card title="Pattern insights" icon="✦">
-          <p className="muted">Do a quick mood & energy check-in each day. After {MIN_DAYS} days the app starts spotting patterns between your habits, focus and how you feel.</p>
+          <p className="muted">After {MIN_DAYS} days of tracking, the app starts spotting patterns: which habits help each other, your strong and weak days, and how focus and journaling affect your consistency.</p>
           <div className="progress"><div style={{ width: `${(ins.have / MIN_DAYS) * 100}%` }} /></div>
           <p className="muted small">{ins.have}/{MIN_DAYS} days</p>
         </Card>
@@ -130,7 +135,6 @@ function Insights({ data }) {
 }
 
 const fmtPct = (v) => (v === null ? '–' : `${Math.round(v * 100)}%`)
-const fmtNum = (v) => (v === null ? '–' : v.toFixed(1))
 const delta = (a, b, kind = 'pct') => {
   if (a === null || b === null || a === undefined || b === undefined) return null
   const d = a - b
@@ -169,8 +173,8 @@ function Reviews({ data, actions, game }) {
           <div><b>{fmtPct(c.completion)}</b><span>habits {delta(c.completion, r.prev.completion)}</span></div>
           <div><b>{fmtMinutes(c.focus)}</b><span>focus {delta(c.focus, r.prev.focus, 'min')}</span></div>
           <div><b>{c.steps}</b><span>micro-goals {delta(c.steps, r.prev.steps, 'min')}</span></div>
-          <div><b>{fmtNum(c.energy)}</b><span>avg energy {delta(c.energy, r.prev.energy, 'num')}</span></div>
-          <div><b>{fmtNum(c.mood)}</b><span>avg mood {delta(c.mood, r.prev.mood, 'num')}</span></div>
+          <div><b>{c.tasks}</b><span>tasks done {delta(c.tasks, r.prev.tasks, 'min')}</span></div>
+          <div><b>{c.journals}</b><span>journal days {delta(c.journals, r.prev.journals, 'min')}</span></div>
           <div><b>+{c.xp}</b><span>XP earned</span></div>
         </div>
 

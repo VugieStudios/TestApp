@@ -1,12 +1,16 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { Card, Seg } from '../components/ui.jsx'
 import { PlayerCard } from '../components/game.jsx'
 import { RANKS, XP } from '../lib/game.js'
 import { fmtMinutes, todayKey } from '../lib/dates.js'
 import { supabase } from '../lib/supabase.js'
+import { useTimer } from '../lib/timer.jsx'
 
 export default function Profile({ data, actions, game }) {
   const fileRef = useRef()
+  const [resetting, setResetting] = useState(false)
+  const timer = useTimer()
+  const [confirmText, setConfirmText] = useState('')
   const unlocked = game.badges.filter((b) => b.unlocked).length
 
   const exportData = () => {
@@ -74,7 +78,7 @@ export default function Profile({ data, actions, game }) {
           <li><span>Focus</span><b>+{XP.focusMinute}/min · +{XP.focusSession} per session</b></li>
           <li><span>1-minute rule start</span><b>+{XP.kick}</b></li>
           <li><span>Finish a task</span><b>+{XP.task}</b></li>
-          <li><span>Journal / check-in</span><b>+{XP.journal} / +{XP.checkin}</b></li>
+          <li><span>Journal</span><b>+{XP.journal}</b></li>
           <li><span>All daily quests</span><b>+{XP.allQuests}</b></li>
           <li><span>Weekly / monthly review</span><b>+{XP.weeklyReview} / +{XP.monthlyReview}</b></li>
           <li><span>Streak reward: 7 / 30 / 100 days</span><b>+{XP.streak7} / +{XP.streak30} / +{XP.streak100}</b></li>
@@ -103,6 +107,30 @@ export default function Profile({ data, actions, game }) {
           <button className="ghost" onClick={() => fileRef.current.click()}>Restore backup</button>
           <input ref={fileRef} type="file" accept="application/json" hidden onChange={importData} />
         </div>
+      </Card>
+
+      <Card title="Reset account" icon="⚠" className="danger-zone">
+        {!resetting ? (
+          <>
+            <p className="muted small">Delete all habits, goals, journal entries, XP and badges and start from zero. Your login stays the same. Tip: download a backup first.</p>
+            <button className="ghost danger" onClick={() => setResetting(true)}>Reset my account…</button>
+          </>
+        ) : (
+          <>
+            <p className="small">This can't be undone. Type <b>RESET</b> to confirm.</p>
+            <input value={confirmText} onChange={(e) => setConfirmText(e.target.value)} placeholder="RESET" autoCapitalize="characters" />
+            <div className="row tight end">
+              <button className="ghost" onClick={() => { setResetting(false); setConfirmText('') }}>Cancel</button>
+              <button
+                className="danger-btn"
+                disabled={confirmText.trim().toUpperCase() !== 'RESET'}
+                onClick={() => { timer.clear(); actions.resetAll(); setResetting(false); setConfirmText(''); window.scrollTo({ top: 0 }) }}
+              >
+                Delete everything
+              </button>
+            </div>
+          </>
+        )}
       </Card>
 
       <button className="ghost danger" onClick={() => supabase.auth.signOut()}>Log out</button>

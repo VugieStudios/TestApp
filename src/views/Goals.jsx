@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Card, Seg, XpChip } from '../components/ui.jsx'
 import { daysUntil, shortDate, todayKey } from '../lib/dates.js'
-import { breakdown, CATEGORIES, detectCategory, goalPace, goalProgress, parseMeasurable } from '../lib/goals.js'
+import { breakdown, CATEGORIES, detectCategory, goalPace, goalProgress, guessMode, parseMeasurable } from '../lib/goals.js'
 import { uid } from '../lib/store.js'
 import { XP } from '../lib/game.js'
 
@@ -48,48 +48,101 @@ function StepEditor({ steps, setSteps }) {
   )
 }
 
-function NewGoal({ actions, onClose }) {
-  const [f, setF] = useState({ title: '', why: '', horizon: 'short', deadline: '', category: 'general' })
-  const [steps, setSteps] = useState(null)
-  const [touchedCat, setTouchedCat] = useState(false)
+function MeasureBox({ measure, setMeasure }) {
+  const level = measure.mode === 'level'
+  return (
+    <div className="measure">
+      <p className="label">Measurable goal: {measure.unit === '€' ? `€${measure.amount}` : `${measure.amount} ${measure.unit}`}</p>
+      <Seg
+        small
+        value={measure.mode}
+        onChange={(mode) => setMeasure({ ...measure, mode })}
+        options={[['level', 'Reach a level'], ['total', 'Build up a total']]}
+      />
+      <p className="muted small">
+        {level ? 'Like bench 65 kg or FTP 300 W: steps go up gradually from where you are now.' : 'Like 500 km this month or 12 books: the amount is split into chunks.'}
+      </p>
+      <label className="field">
+        <span className="label">{level ? 'Where are you now?' : 'Already done so far'}</span>
+        <div className="unit-input">
+          <input type="number" inputMode="decimal" min="0" value={measure.start} placeholder={level ? 'e.g. 40' : '0'} onChange={(e) => setMeasure({ ...measure, start: e.target.value })} />
+          <span>{measure.unit}</span>
+        </div>
+        {level && measure.start === '' && <span className="muted small">Leave empty and the plan starts with a test of your current level.</span>}
+      </label>
+    </div>
+  )
+}
 
-  const setTitle = (title) => setF({ ...f, title, category: touchedCat ? f.category : detectCategory(title) })
+function NewGoal({ actions, onClose, initial }) {
+  const [f, setF] = useState(
+    initial
+      ? { title: initial.title, why: initial.why || '', horizon: initial.horizon, deadline: initial.deadline || '', category: initial.category }
+      : { title: '', why: '', horizon: 'short', deadline: '', category: 'general' }
+  )
+  const [measure, setMeasure] = useState(() => {
+    if (!initial) return null
+    if (initial.measure) return initial.measure
+    const m = parseMeasurable(initial.title)
+    return m && { ...m, mode: guessMode(initial.title, m.unit), start: '' }
+  })
+  const [steps, setSteps] = useState(null)
+  const [touchedCat, setTouchedCat] = useState(!!initial)
+
+  // detect a number + unit in the title, keep the user's choices if the unit stays the same
+  const setTitle = (title) => {
+    setF({ ...f, title, category: touchedCat ? f.category : detectCategory(title) })
+    const m = parseMeasurable(title)
+    if (!m) return setMeasure(null)
+    setMeasure((old) => ({ ...m, mode: old && old.unit === m.unit ? old.mode : guessMode(title, m.unit), start: old && old.unit === m.unit ? old.start : '' }))
+  }
+
   const generate = (e) => {
     e?.preventDefault()
     if (!f.title.trim()) return
-    setSteps(breakdown({ ...f, deadline: f.deadline || null }))
+    setSteps(breakdown({ ...f, deadline: f.deadline || null, measure }))
   }
+
   const save = () => {
-    actions.addGoal({ ...f, title: f.title.trim(), deadline: f.deadline || null, steps })
+    const fields = { ...f, title: f.title.trim(), deadline: f.deadline || null, measure }
+    if (initial) {
+      actions.editGoal(initial.id, fields)
+      actions.setSteps(initial.id, [...initial.steps.filter((x) => x.done), ...steps])
+    } else {
+      actions.addGoal({ ...fields, steps })
+    }
     onClose()
   }
-  const measurable = parseMeasurable(f.title)
 
   if (steps) {
     return (
       <Card title="Your plan" icon="✦">
         <p className="muted small">
-          {measurable
-            ? `Split ${measurable.unit === '€' ? '€' : ''}${measurable.amount}${measurable.unit === '€' ? '' : ' ' + measurable.unit} into equal chunks until your deadline.`
+          {measure
+            ? measure.mode === 'level'
+              ? `Gradual steps from ${measure.start === '' ? 'your tested level' : `${measure.start} ${measure.unit}`} up to ${measure.amount} ${measure.unit}.`
+              : `The remaining amount split into equal chunks.`
             : `Built from the ${CATEGORIES[f.category].label.toLowerCase()} template.`}{' '}
           Edit anything you like. Each step becomes a micro-goal on your dashboard on its date.
+          {initial && initial.steps.some((x) => x.done) && ' Steps you already finished are kept.'}
         </p>
         <StepEditor steps={steps} setSteps={setSteps} />
         <div className="row tight end">
           <button className="ghost" onClick={() => setSteps(null)}>Back</button>
-          <button className="primary" onClick={save} disabled={!steps.length}>Save goal</button>
+          <button className="primary" onClick={save} disabled={!steps.length}>{initial ? 'Save new plan' : 'Save goal'}</button>
         </div>
       </Card>
     )
   }
 
   return (
-    <Card title="New goal" icon="◎">
+    <Card title={initial ? `Re-plan: ${initial.title}` : 'New goal'} icon="◎">
       <form className="stack-sm" onSubmit={generate}>
         <label className="field">
           <span className="label">What do you want to achieve?</span>
-          <input autoFocus value={f.title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Ride 500 km in December, Learn basic Spanish" />
+          <input autoFocus={!initial} value={f.title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Bench 65 kg, Ride 500 km in December, Learn basic Spanish" />
         </label>
+        {measure && <MeasureBox measure={measure} setMeasure={setMeasure} />}
         <label className="field">
           <span className="label">Why does it matter?</span>
           <input value={f.why} onChange={(e) => setF({ ...f, why: e.target.value })} placeholder="Your reason keeps you going on hard days" />
@@ -100,12 +153,14 @@ function NewGoal({ actions, onClose }) {
             <span className="label">Deadline</span>
             <input type="date" value={f.deadline} min={todayKey()} onChange={(e) => setF({ ...f, deadline: e.target.value })} />
           </label>
-          <label className="field grow">
-            <span className="label">Type {!touchedCat && f.title && '(auto-detected)'}</span>
-            <select value={f.category} onChange={(e) => { setTouchedCat(true); setF({ ...f, category: e.target.value }) }}>
-              {Object.entries(CATEGORIES).map(([k, c]) => <option key={k} value={k}>{c.icon} {c.label}</option>)}
-            </select>
-          </label>
+          {!measure && (
+            <label className="field grow">
+              <span className="label">Type {!touchedCat && f.title && '(auto-detected)'}</span>
+              <select value={f.category} onChange={(e) => { setTouchedCat(true); setF({ ...f, category: e.target.value }) }}>
+                {Object.entries(CATEGORIES).map(([k, c]) => <option key={k} value={k}>{c.icon} {c.label}</option>)}
+              </select>
+            </label>
+          )}
         </div>
         <div className="row tight end">
           <button type="button" className="ghost" onClick={onClose}>Cancel</button>
@@ -120,10 +175,13 @@ function GoalCard({ g, actions, ui }) {
   const [open, setOpen] = useState(false)
   const [text, setText] = useState('')
   const [editingPlan, setEditingPlan] = useState(null)
+  const [replanning, setReplanning] = useState(false)
   const pct = Math.round(goalProgress(g) * 100)
   const pace = goalPace(g)
   const next = g.steps.find((s) => !s.done)
   const left = g.deadline ? daysUntil(g.deadline) : null
+
+  if (replanning) return <NewGoal actions={actions} initial={g} onClose={() => setReplanning(false)} />
 
   if (editingPlan) {
     return (
@@ -190,11 +248,7 @@ function GoalCard({ g, actions, ui }) {
           )}
           <div className="row tight wrap end">
             <button className="ghost small" onClick={() => setEditingPlan(g.steps)}>Edit plan</button>
-            {!g.done && (
-              <button className="ghost small" onClick={() => window.confirm('Replace the remaining steps with a fresh plan?') && actions.setSteps(g.id, [...g.steps.filter((s) => s.done), ...breakdown(g)])}>
-                Regenerate
-              </button>
-            )}
+            {!g.done && <button className="ghost small" onClick={() => setReplanning(true)}>Re-plan</button>}
             <button className="ghost small" onClick={() => actions.editGoal(g.id, { done: !g.done })}>{g.done ? 'Reopen' : <>Mark achieved <XpChip n={XP.goal} /></>}</button>
             <button className="ghost small danger" onClick={() => window.confirm(`Delete "${g.title}"?`) && actions.deleteGoal(g.id)}>Delete</button>
           </div>

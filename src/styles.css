@@ -274,13 +274,13 @@ input[type='checkbox'] { width: 20px; height: 20px; accent-color: var(--accent);
 .trend line { stroke: var(--line); }
 .trend polyline { fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
 .t-comp { stroke: var(--accent); }
-.t-energy { stroke: var(--gold); }
-.t-mood { stroke: var(--violet); }
+.t-focus { stroke: var(--gold); }
+.t-journal { stroke: var(--violet); }
 .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 0.75rem; color: var(--muted); align-items: center; }
 .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 4px; vertical-align: -1px; }
 .l-comp, .legend i.on { background: var(--accent); }
-.l-energy { background: var(--gold); }
-.l-mood { background: var(--violet); }
+.l-focus { background: var(--gold); }
+.l-journal { background: var(--violet); }
 .legend i.frozen { background: rgba(124, 200, 255, 0.35); }
 .legend i.miss { background: rgba(255, 107, 107, 0.25); }
 .legend i.na { background: var(--bg-2); border: 1px solid var(--line); }
@@ -405,3 +405,12 @@ input[type='checkbox'] { width: 20px; height: 20px; accent-color: var(--accent);
 .error { color: var(--danger); font-size: 0.88rem; }
 
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+/* measurable goal box */
+.measure { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 12px; background: var(--bg-2); border: 1px solid var(--line); }
+.measure .label { margin-bottom: 0; }
+.unit-input { display: flex; align-items: center; gap: 8px; }
+.unit-input input { max-width: 140px; }
+.unit-input span { color: var(--muted); font-weight: 600; }
+.danger-zone { border-color: rgba(255, 107, 107, 0.3); }
+.danger-btn { background: var(--danger); color: #2a0606; border-color: var(--danger); }
