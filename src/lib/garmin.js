@@ -225,13 +225,16 @@ async function readError(error) {
   } catch {
     /* not JSON */
   }
-  if (/not found|404/i.test(msg) || error?.context?.status === 404) msg = 'The Garmin bridge is not set up on Supabase yet (function "garmin-sync" not found).'
-  if (/Failed to send a request|fetch/i.test(msg)) msg = 'Could not reach the Garmin bridge. Check that a function named exactly "garmin-sync" is deployed in Supabase and that "Verify JWT" is switched off for it.'
+  if (error?.context?.status === 404) msg = `The Garmin bridge is not set up on Supabase yet (function "${BRIDGE}" not found).`
+  if (error?.name === 'FunctionsFetchError') msg = `Could not reach the Garmin bridge. Check that the "${BRIDGE}" function is deployed in Supabase and that "Verify JWT" is switched off for it.`
   return msg
 }
 
+// Name (slug) of the Edge Function in Supabase. It was created as "garmin-sinc".
+export const BRIDGE = 'garmin-sinc'
+
 export async function fetchGarmin(start, end) {
-  const { data, error } = await supabase.functions.invoke('garmin-sync', { body: { paths: buildPaths(start, end) } })
+  const { data, error } = await supabase.functions.invoke(BRIDGE, { body: { paths: buildPaths(start, end) } })
   if (error) throw new Error(await readError(error))
   if (data?.error) throw new Error(data.error)
   return parseAll(data?.results)
