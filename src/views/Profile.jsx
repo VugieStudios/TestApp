@@ -1,17 +1,13 @@
 import { useRef } from 'react'
-import { lastDays, prettyDate, todayKey } from '../dates.js'
-import { streak } from '../store.js'
-import { RANKS, XP } from '../game.js'
-import { PlayerCard } from '../components/Game.jsx'
+import { Card, Seg } from '../components/ui.jsx'
+import { PlayerCard } from '../components/game.jsx'
+import { RANKS, XP } from '../lib/game.js'
+import { fmtMinutes, todayKey } from '../lib/dates.js'
+import { supabase } from '../lib/supabase.js'
 
 export default function Profile({ data, actions, game }) {
-  const days30 = lastDays(30)
   const fileRef = useRef()
-  const habits = data.habits.filter((h) => !h.archived)
-  const rate = (habitId) => Math.round((days30.filter((d) => data.checks[d]?.[habitId]).length / 30) * 100)
-  const daily = days30.map((d) => (habits.length ? habits.filter((h) => data.checks[d]?.[h.id]).length / habits.length : 0))
   const unlocked = game.badges.filter((b) => b.unlocked).length
-  const nextRank = RANKS.find((r) => r.level > game.level)
 
   const exportData = () => {
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
@@ -20,14 +16,13 @@ export default function Profile({ data, actions, game }) {
     a.download = `grow-backup-${todayKey()}.json`
     a.click()
   }
-
   const importData = (e) => {
     const file = e.target.files[0]
     if (!file) return
     file.text().then((text) => {
       try {
         const parsed = JSON.parse(text)
-        if (window.confirm('Replace everything in the app with this backup?')) actions.replaceAll(parsed)
+        if (window.confirm('Replace everything with this backup?')) actions.replaceAll(parsed)
       } catch {
         window.alert("That file isn't a valid backup.")
       }
@@ -37,87 +32,80 @@ export default function Profile({ data, actions, game }) {
 
   return (
     <div className="stack">
+      <header className="page-head"><h1>Profile</h1></header>
       <PlayerCard game={game} />
 
       <div className="stat-grid">
-        <div className="stat"><b>{game.bestStreak}</b><span>Best streak</span></div>
-        <div className="stat"><b>{game.perfectDays}</b><span>Perfect days</span></div>
-        <div className="stat"><b>{game.totalChecks}</b><span>Habits done</span></div>
-        <div className="stat"><b>{game.goalsDone}</b><span>Goals achieved</span></div>
+        <div className="stat"><b>{game.totalChecks}</b><span>habits done</span></div>
+        <div className="stat"><b>{fmtMinutes(game.focusMinutes)}</b><span>focused</span></div>
+        <div className="stat"><b>{game.stepsDone}</b><span>micro-goals</span></div>
+        <div className="stat"><b>{game.goalsDone}</b><span>goals achieved</span></div>
       </div>
 
-      {nextRank && (
-        <section className="card next-rank">
-          <span className="big">{nextRank.icon}</span>
-          <div className="grow">
-            <p className="muted small">Next rank</p>
-            <h2>{nextRank.name}</h2>
-          </div>
-          <span className="muted small">at level {nextRank.level}</span>
-        </section>
-      )}
-
-      <section className="card">
-        <div className="card-head">
-          <h2>🏅 Badges</h2>
-          <span className="muted small">{unlocked}/{game.badges.length}</span>
+      <Card title="Ranks" icon="♛">
+        <div className="ranks">
+          {RANKS.map((r) => (
+            <div key={r.name} className={`rank-step ${game.level >= r.level ? 'reached' : ''} ${game.rank.name === r.name ? 'current' : ''}`}>
+              <b>{r.level}</b>
+              <span>{r.name}</span>
+            </div>
+          ))}
         </div>
+      </Card>
+
+      <Card title="Badges" icon="◆" right={<span className="muted small">{unlocked}/{game.badges.length}</span>}>
         <div className="badge-grid">
           {game.badges.map((b) => (
             <div key={b.id} className={`badge ${b.unlocked ? 'on' : ''}`} title={b.desc}>
-              <span className="badge-icon">{b.unlocked ? b.icon : '🔒'}</span>
+              <span className="badge-icon">{b.icon}</span>
               <b>{b.name}</b>
               <span>{b.desc}</span>
             </div>
           ))}
         </div>
-      </section>
+      </Card>
 
-      <section className="card">
-        <div className="card-head">
-          <h2>📅 Last 30 days</h2>
-          <span className="muted small">brighter = more habits done</span>
-        </div>
-        <div className="month">
-          {days30.map((d, i) => (
-            <div key={d} className="month-day" title={`${prettyDate(d, { day: 'numeric', month: 'short' })}: ${Math.round(daily[i] * 100)}%`} style={{ '--fill': daily[i] }} />
-          ))}
-        </div>
-      </section>
-
-      <section className="card">
-        <h2>📊 Habit consistency</h2>
-        {habits.length === 0 && <p className="muted">No active habits.</p>}
-        {habits.map((h) => (
-          <div key={h.id} className="bar-row">
-            <span className="grow">{h.emoji} {h.name}</span>
-            <span className="muted small">🔥{streak(data.checks, h.id)}</span>
-            <div className="bar"><div style={{ width: `${rate(h.id)}%` }} /></div>
-            <span className="small pct">{rate(h.id)}%</span>
-          </div>
-        ))}
-      </section>
-
-      <section className="card">
-        <h2>💡 How to earn XP</h2>
+      <Card title="How you earn XP" icon="✦">
         <ul className="xp-rules">
           <li><span>Complete a habit</span><b>+{XP.habit}</b></li>
-          <li><span>All habits in a day</span><b>+{XP.perfectDay}</b></li>
-          <li><span>Write a reflection</span><b>+{XP.reflection}</b></li>
-          <li><span>Finish a goal step</span><b>+{XP.step}</b></li>
-          <li><span>Finish all daily quests</span><b>+{XP.allQuests}</b></li>
+          <li><span>Complete all habits of the day</span><b>+{XP.completeDay}</b></li>
+          <li><span>Finish a micro-goal</span><b>+{XP.step}</b></li>
           <li><span>Achieve a goal</span><b>+{XP.goal}</b></li>
+          <li><span>Focus</span><b>+{XP.focusMinute}/min · +{XP.focusSession} per session</b></li>
+          <li><span>1-minute rule start</span><b>+{XP.kick}</b></li>
+          <li><span>Finish a task</span><b>+{XP.task}</b></li>
+          <li><span>Journal / check-in</span><b>+{XP.journal} / +{XP.checkin}</b></li>
+          <li><span>All daily quests</span><b>+{XP.allQuests}</b></li>
+          <li><span>Weekly / monthly review</span><b>+{XP.weeklyReview} / +{XP.monthlyReview}</b></li>
+          <li><span>Streak reward: 7 / 30 / 100 days</span><b>+{XP.streak7} / +{XP.streak30} / +{XP.streak100}</b></li>
         </ul>
-      </section>
+      </Card>
 
-      <section className="card">
-        <h2>💾 Your data</h2>
+      <Card title="Settings" icon="⚙">
+        <div className="setting">
+          <span className="grow">Focus length</span>
+          <Seg small value={data.settings.focusMinutes} onChange={(v) => actions.setSettings({ focusMinutes: v })} options={[[15, '15'], [25, '25'], [45, '45'], [60, '60']]} />
+        </div>
+        <div className="setting">
+          <span className="grow">Break length</span>
+          <Seg small value={data.settings.breakMinutes} onChange={(v) => actions.setSettings({ breakMinutes: v })} options={[[5, '5'], [10, '10'], [15, '15']]} />
+        </div>
+        <div className="setting">
+          <span className="grow">Streak freezes per week</span>
+          <Seg small value={data.settings.freezesPerWeek} onChange={(v) => actions.setSettings({ freezesPerWeek: v })} options={[[0, '0'], [1, '1'], [2, '2']]} />
+        </div>
+      </Card>
+
+      <Card title="Data" icon="⬇">
+        <p className="muted small">Your data syncs to your account automatically. A backup file is extra safety.</p>
         <div className="row tight wrap">
           <button onClick={exportData}>Download backup</button>
           <button className="ghost" onClick={() => fileRef.current.click()}>Restore backup</button>
           <input ref={fileRef} type="file" accept="application/json" hidden onChange={importData} />
         </div>
-      </section>
+      </Card>
+
+      <button className="ghost danger" onClick={() => supabase.auth.signOut()}>Log out</button>
     </div>
   )
 }

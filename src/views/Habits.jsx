@@ -1,83 +1,170 @@
 import { useState } from 'react'
-import { lastDays, prettyDate } from '../dates.js'
-import { streak, bestStreak } from '../store.js'
+import { Card, Seg } from '../components/ui.jsx'
+import { lastDays, prettyDate, todayKey, WEEKDAYS } from '../lib/dates.js'
+import { bestStreak, describeSchedule, isDone, isExcused, isScheduled, streakInfo, weekCount } from '../lib/habits.js'
 
-export default function Habits({ data, actions }) {
-  const [name, setName] = useState('')
-  const [emoji, setEmoji] = useState('')
-  const days = lastDays(14)
+const EMPTY = { name: '', emoji: '', schedule: { type: 'daily' }, core: false }
 
-  const add = (e) => {
+function HabitForm({ initial = EMPTY, onSave, onCancel, submitLabel }) {
+  const [f, setF] = useState(initial)
+  const s = f.schedule
+  const setSchedule = (type) =>
+    setF({ ...f, schedule: type === 'daily' ? { type } : type === 'days' ? { type, days: s.days || [0, 2, 4] } : { type, times: s.times || 3 } })
+
+  const submit = (e) => {
     e.preventDefault()
-    if (!name.trim()) return
-    actions.addHabit(name.trim(), emoji.trim())
-    setName('')
-    setEmoji('')
+    if (!f.name.trim()) return
+    if (s.type === 'days' && !s.days.length) return
+    onSave({ ...f, name: f.name.trim(), emoji: f.emoji.trim() || '✦' })
   }
 
+  return (
+    <form className="stack-sm" onSubmit={submit}>
+      <div className="row">
+        <input className="emoji-input" placeholder="🙂" value={f.emoji} onChange={(e) => setF({ ...f, emoji: e.target.value })} maxLength={4} aria-label="Emoji" />
+        <input className="grow" placeholder="Habit name, e.g. Pray in the morning" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} autoFocus />
+      </div>
+      <Seg value={s.type} onChange={setSchedule} options={[['daily', 'Every day'], ['days', 'Specific days'], ['weekly', 'X per week']]} />
+      {s.type === 'days' && (
+        <div className="day-picker">
+          {WEEKDAYS.map((d, i) => (
+            <button
+              type="button"
+              key={d}
+              className={s.days.includes(i) ? 'on' : ''}
+              onClick={() => setF({ ...f, schedule: { ...s, days: s.days.includes(i) ? s.days.filter((x) => x !== i) : [...s.days, i].sort() } })}
+            >
+              {d[0]}
+            </button>
+          ))}
+        </div>
+      )}
+      {s.type === 'weekly' && (
+        <div className="row">
+          <span className="grow muted">Times per week</span>
+          <div className="stepper">
+            <button type="button" onClick={() => setF({ ...f, schedule: { ...s, times: Math.max(1, s.times - 1) } })}>−</button>
+            <b>{s.times}</b>
+            <button type="button" onClick={() => setF({ ...f, schedule: { ...s, times: Math.min(7, s.times + 1) } })}>+</button>
+          </div>
+        </div>
+      )}
+      <label className="switch-row">
+        <span className="grow">
+          <b>Core habit</b>
+          <span className="muted small block">Stays visible in Low Energy Mode. Pick your 1–3 most important.</span>
+        </span>
+        <input type="checkbox" checked={f.core} onChange={(e) => setF({ ...f, core: e.target.checked })} />
+      </label>
+      <div className="row tight end">
+        {onCancel && <button type="button" className="ghost" onClick={onCancel}>Cancel</button>}
+        <button className="primary">{submitLabel}</button>
+      </div>
+    </form>
+  )
+}
+
+function Heat({ data, h, info }) {
+  const days = lastDays(28)
+  return (
+    <div className="heat">
+      {days.map((d) => {
+        const done = isDone(data, h, d)
+        let cls = 'off'
+        if (done) cls = 'on'
+        else if (info.frozen.has(d)) cls = 'frozen'
+        else if (d < h.createdAt || isExcused(data, h, d)) cls = 'na'
+        else if (h.schedule.type !== 'weekly' && !isScheduled(h, d)) cls = 'na'
+        else if (d === todayKey()) cls = 'today'
+        else if (h.schedule.type !== 'weekly') cls = 'miss'
+        return <span key={d} className={cls} title={`${prettyDate(d, { weekday: 'short', day: 'numeric', month: 'short' })}${cls === 'frozen' ? ' (freeze used)' : ''}`}>{cls === 'frozen' ? '❄' : ''}</span>
+      })}
+    </div>
+  )
+}
+
+function HabitCard({ data, actions, h }) {
+  const [editing, setEditing] = useState(false)
+  const info = streakInfo(data, h)
+  if (editing) {
+    return (
+      <Card title="Edit habit">
+        <HabitForm initial={h} submitLabel="Save" onCancel={() => setEditing(false)} onSave={(f) => { actions.editHabit(h.id, f); setEditing(false) }} />
+      </Card>
+    )
+  }
+  return (
+    <section className="card habit-card">
+      <div className="card-head">
+        <div className="row grow">
+          <span className="emoji big">{h.emoji}</span>
+          <div className="grow">
+            <h2>{h.name} {h.core && <span className="tag">core</span>}</h2>
+            <p className="muted small">
+              {describeSchedule(h.schedule)}
+              {h.schedule.type === 'weekly' && ` · ${weekCount(data, h, todayKey())}/${h.schedule.times} this week`}
+            </p>
+          </div>
+        </div>
+        <button className="icon-btn" onClick={() => setEditing(true)} aria-label="Edit">✎</button>
+      </div>
+      <div className="streak-row">
+        <div><b>{info.count}</b><span>{info.unit === 'week' ? 'week' : 'day'} streak</span></div>
+        <div><b>{bestStreak(data, h)}</b><span>best</span></div>
+        <div><b>{'❄'.repeat(info.freezesLeft) || '–'}</b><span>freezes left</span></div>
+      </div>
+      <Heat data={data} h={h} info={info} />
+      <div className="row tight end">
+        <button className="ghost small" onClick={() => actions.editHabit(h.id, { archived: true })}>Pause</button>
+      </div>
+    </section>
+  )
+}
+
+export default function Habits({ data, actions }) {
+  const [adding, setAdding] = useState(false)
   const active = data.habits.filter((h) => !h.archived)
-  const archived = data.habits.filter((h) => h.archived)
+  const paused = data.habits.filter((h) => h.archived)
 
   return (
     <div className="stack">
-      <h1>Habits</h1>
+      <header className="page-head">
+        <h1>Habits</h1>
+        {!adding && <button className="primary" onClick={() => setAdding(true)}>+ New habit</button>}
+      </header>
 
-      <form className="card row" onSubmit={add}>
-        <input className="emoji-input" placeholder="🙂" value={emoji} onChange={(e) => setEmoji(e.target.value)} maxLength={4} />
-        <input className="grow" placeholder="New habit, e.g. Pray in the morning" value={name} onChange={(e) => setName(e.target.value)} />
-        <button className="primary">Add</button>
-      </form>
+      {adding && (
+        <Card title="New habit">
+          <HabitForm submitLabel="Add habit" onCancel={() => setAdding(false)} onSave={(f) => { actions.addHabit(f); setAdding(false) }} />
+        </Card>
+      )}
 
-      {active.map((h) => (
-        <section key={h.id} className="card">
-          <div className="card-head">
-            <h2>
-              {h.emoji} {h.name}
-            </h2>
-            <div className="row tight">
-              <button className="ghost small" onClick={() => actions.editHabit(h.id, { archived: true })}>Pause</button>
-            </div>
-          </div>
-          <div className="stats">
-            <span>🔥 {streak(data.checks, h.id)} day streak</span>
-            <span className="muted">Best: {bestStreak(data.checks, h.id)}</span>
-          </div>
-          <div className="heat">
-            {days.map((d) => (
-              <button
-                key={d}
-                title={prettyDate(d, { weekday: 'short', day: 'numeric', month: 'short' })}
-                className={data.checks[d]?.[h.id] ? 'on' : ''}
-                onClick={() => actions.toggleCheck(d, h.id)}
-              >
-                {prettyDate(d, { weekday: 'narrow' })}
-              </button>
-            ))}
-          </div>
-          <p className="muted small">Last 14 days. Tap a day to fix a missed check.</p>
-        </section>
-      ))}
+      <Card title="Streak freezes" icon="❄">
+        <p className="muted small">Missed a day? A freeze saves your streak automatically. You get this many per habit, per week.</p>
+        <Seg value={data.settings.freezesPerWeek} onChange={(v) => actions.setSettings({ freezesPerWeek: v })} options={[[0, 'None'], [1, '1 / week'], [2, '2 / week']]} />
+      </Card>
 
-      {archived.length > 0 && (
-        <section className="card">
-          <h2>Paused</h2>
-          <ul className="plain">
-            {archived.map((h) => (
-              <li key={h.id} className="row">
-                <span className="grow">
-                  {h.emoji} {h.name}
-                </span>
-                <button className="ghost small" onClick={() => actions.editHabit(h.id, { archived: false })}>Resume</button>
-                <button
-                  className="ghost small danger"
-                  onClick={() => window.confirm(`Delete "${h.name}" and its history?`) && actions.deleteHabit(h.id)}
-                >
-                  Delete
-                </button>
+      {active.map((h) => <HabitCard key={h.id} data={data} actions={actions} h={h} />)}
+
+      <div className="legend">
+        <span><i className="on" /> done</span>
+        <span><i className="frozen" /> freeze</span>
+        <span><i className="miss" /> missed</span>
+        <span><i className="na" /> not scheduled</span>
+      </div>
+
+      {paused.length > 0 && (
+        <Card title="Paused">
+          <ul className="items">
+            {paused.map((h) => (
+              <li key={h.id}>
+                <span className="grow">{h.emoji} {h.name}</span>
+                <button className="pill" onClick={() => actions.editHabit(h.id, { archived: false })}>Resume</button>
+                <button className="icon-btn danger" onClick={() => window.confirm(`Delete "${h.name}" and its history?`) && actions.deleteHabit(h.id)} aria-label="Delete">🗑</button>
               </li>
             ))}
           </ul>
-        </section>
+        </Card>
       )}
     </div>
   )

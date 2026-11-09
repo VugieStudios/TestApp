@@ -1,130 +1,95 @@
-import { prettyDate, todayKey, daysUntil } from '../dates.js'
-import { streak } from '../store.js'
-import { questsFor, XP } from '../game.js'
-import { PlayerCard } from '../components/Game.jsx'
+import { useState } from 'react'
+import { WIDGETS, PRESETS } from '../widgets/index.jsx'
+import { DEFAULT_DASHBOARD } from '../lib/store.js'
+import { prettyDate, todayKey } from '../lib/dates.js'
 
-const PROMPTS = [
-  { key: 'gratitude', label: "I'm grateful for…" },
-  { key: 'win', label: "Today's win" },
-  { key: 'improve', label: 'Tomorrow I want to do better at…' },
-]
+function greeting() {
+  const h = new Date().getHours()
+  return h < 6 ? 'Good night' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'
+}
 
-export default function Today({ data, actions, goTo, game }) {
-  const date = todayKey()
-  const habits = data.habits.filter((h) => !h.archived)
-  const checks = data.checks[date] || {}
-  const entry = data.entries[date] || {}
-  const quests = questsFor(data, date)
-  const questsDone = quests.list.filter((q) => q.done).length
+function Customize({ layout, setLayout, onClose }) {
+  const move = (i, dir) => {
+    const next = [...layout]
+    const j = i + dir
+    if (j < 0 || j >= next.length) return
+    ;[next[i], next[j]] = [next[j], next[i]]
+    setLayout(next)
+  }
+  return (
+    <section className="card customize">
+      <div className="card-head">
+        <h2>Customize dashboard</h2>
+        <button className="primary small" onClick={onClose}>Done</button>
+      </div>
+      <div className="row tight wrap">
+        <span className="muted small">Presets:</span>
+        {Object.entries(PRESETS).map(([name, ids]) => (
+          <button key={name} className="pill" onClick={() => setLayout(ids.map((id) => ({ id, hidden: false })))}>{name}</button>
+        ))}
+        <button className="pill" onClick={() => setLayout(DEFAULT_DASHBOARD)}>Reset</button>
+      </div>
+      <ul className="layout-list">
+        {layout.map((w, i) => (
+          <li key={w.id} className={w.hidden ? 'hidden' : ''}>
+            <span className="grow">{WIDGETS[w.id].name}</span>
+            <button className="icon-btn" onClick={() => move(i, -1)} disabled={i === 0} aria-label="Move up">↑</button>
+            <button className="icon-btn" onClick={() => move(i, 1)} disabled={i === layout.length - 1} aria-label="Move down">↓</button>
+            <button
+              className={`toggle ${w.hidden ? '' : 'on'}`}
+              onClick={() => setLayout(layout.map((x) => (x.id === w.id ? { ...x, hidden: !x.hidden } : x)))}
+              aria-label={w.hidden ? 'Show' : 'Hide'}
+            >
+              <i />
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
 
-  const nextSteps = data.goals
-    .filter((g) => !g.done)
-    .map((g) => ({ goal: g, step: g.steps.find((s) => !s.done) }))
-    .filter((x) => x.step)
-    .slice(0, 3)
+export default function Today(props) {
+  const { data, actions } = props
+  const [editing, setEditing] = useState(false)
+  const today = todayKey()
+  const low = !!data.lowEnergy[today]
+  const layout = data.settings.dashboard
+  const visible = layout.filter((w) => !w.hidden && (!low || WIDGETS[w.id].low))
+  const hiddenByLow = low ? layout.filter((w) => !w.hidden && !WIDGETS[w.id].low).length : 0
 
   return (
     <div className="stack">
-      <PlayerCard game={game} />
+      <header className="page-head">
+        <div>
+          <p className="eyebrow">{prettyDate(today)}</p>
+          <h1>{low ? 'Take it easy' : greeting()}</h1>
+        </div>
+        <button className={`low-btn ${low ? 'on' : ''}`} onClick={() => actions.setLowEnergy(!low)}>
+          <span>🔋</span>
+          {low ? 'Low energy: on' : 'Low energy'}
+        </button>
+      </header>
 
-      <section className={`card quests ${quests.allDone ? 'complete' : ''}`}>
-        <div className="card-head">
-          <h2>📜 Daily quests</h2>
-          <span className="muted small">{prettyDate(date, { weekday: 'long', day: 'numeric', month: 'short' })}</span>
+      {low && (
+        <div className="low-banner">
+          <b>Low Energy Mode</b>
+          <p>Only your core habits and one micro-goal today. {hiddenByLow} widgets hidden. Other habits won’t break their streaks. Doing the minimum is still a win.</p>
         </div>
-        <ul className="quest-list">
-          {quests.list.map((q) => (
-            <li key={q.id} className={q.done ? 'done' : ''}>
-              <span className="quest-icon">{q.done ? '✔' : q.icon}</span>
-              <span className="grow">
-                {q.text}
-                {q.progress && !q.done && <span className="muted small"> · {q.progress}</span>}
-              </span>
-              <span className="xp-chip">+{q.xp}</span>
-            </li>
-          ))}
-        </ul>
-        <div className={`chest ${quests.allDone ? 'open' : ''}`}>
-          <span className="chest-icon">{quests.allDone ? '🎁' : '🔒'}</span>
-          <span className="grow">
-            {quests.allDone ? 'Bonus chest opened!' : `Finish all quests for a bonus chest (${questsDone}/3)`}
-          </span>
-          <span className="xp-chip gold">+{XP.allQuests}</span>
-        </div>
-      </section>
+      )}
 
-      <section className="card">
-        <div className="card-head">
-          <h2>⚔️ Habits</h2>
-          <span className="muted small">{habits.filter((h) => checks[h.id]).length}/{habits.length}</span>
-        </div>
-        {habits.length === 0 && (
-          <p className="muted">
-            No habits yet. <button className="link" onClick={() => goTo('habits')}>Add one</button>
-          </p>
-        )}
-        <div className="habit-grid">
-          {habits.map((h) => {
-            const s = streak(data.checks, h.id)
-            const done = !!checks[h.id]
-            return (
-              <button key={h.id} className={`habit-tile ${done ? 'done' : ''}`} onClick={() => actions.toggleCheck(date, h.id)}>
-                <span className="tile-emoji">{h.emoji}</span>
-                <span className="tile-name">{h.name}</span>
-                <span className="tile-foot">
-                  {s > 0 ? <span className="streak">🔥 {s}</span> : <span />}
-                  <span className="xp-chip">{done ? '✔' : `+${XP.habit}`}</span>
-                </span>
-              </button>
-            )
-          })}
-        </div>
-      </section>
+      {editing && <Customize layout={layout} setLayout={(d) => actions.setSettings({ dashboard: d })} onClose={() => setEditing(false)} />}
 
-      <section className="card">
-        <div className="card-head">
-          <h2>✍️ Reflect</h2>
-          <span className="xp-chip">+{XP.reflection}</span>
-        </div>
-        {PROMPTS.map((p) => (
-          <label key={p.key} className="field">
-            <span className="label">{p.label}</span>
-            <textarea rows={2} value={entry[p.key] || ''} onChange={(e) => actions.saveEntry(date, { [p.key]: e.target.value })} />
-          </label>
-        ))}
-        <label className="field">
-          <span className="label">Anything else on your mind</span>
-          <textarea rows={3} value={entry.notes || ''} onChange={(e) => actions.saveEntry(date, { notes: e.target.value })} />
-        </label>
-      </section>
+      {visible.map((w) => {
+        const W = WIDGETS[w.id].component
+        return <W key={w.id} {...props} low={low} />
+      })}
 
-      <section className="card">
-        <div className="card-head">
-          <h2>🎯 Next goal steps</h2>
-          <button className="link" onClick={() => goTo('goals')}>All goals</button>
-        </div>
-        {nextSteps.length === 0 ? (
-          <p className="muted">Nothing lined up. Add a goal with a first step to see it here.</p>
-        ) : (
-          <ul className="checklist">
-            {nextSteps.map(({ goal, step }) => (
-              <li key={step.id}>
-                <label>
-                  <input type="checkbox" checked={false} onChange={() => actions.toggleStep(goal.id, step.id)} />
-                  <span className="grow">
-                    {step.text}
-                    <span className="muted small block">
-                      {goal.title}
-                      {goal.deadline && ` · ${daysUntil(goal.deadline)} days left`}
-                    </span>
-                  </span>
-                  <span className="xp-chip">+{XP.step}</span>
-                </label>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      {!editing && (
+        <button className="ghost customize-btn" onClick={() => { setEditing(true); window.scrollTo({ top: 0, behavior: 'smooth' }) }}>
+          ⚙ Customize dashboard
+        </button>
+      )}
     </div>
   )
 }
