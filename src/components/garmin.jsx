@@ -65,7 +65,7 @@ export function GarminCard({ data, actions, ui }) {
           </div>
         </div>
       )}
-      <p className="muted small">Syncs automatically when you open the app (at most every 3 hours). Link habits to Garmin in the Habits tab.</p>
+      <p className="muted small">Syncs automatically when you open the app and every 15 minutes while it's open. Link habits to Garmin in the Habits tab.</p>
     </Card>
   )
 }
@@ -79,7 +79,7 @@ export function GarminWidget({ data, ui }) {
   const recent = (g.activities || []).filter((a) => a.date >= addDays(today, -6)).slice(0, 3)
   const week = garminRange(g, weekStart(today), today)
   return (
-    <Card title="Garmin" icon="⌚" right={<button className="link small" onClick={() => ui.goTo('stats', 'body')}>Body →</button>}>
+    <Card title="Garmin" icon="⌚" right={<span className="row tight"><button className="pill" disabled={ui.garmin.syncing} onClick={() => ui.garmin.sync()}>{ui.garmin.syncing ? '…' : '↻'}</button><button className="link small" onClick={() => ui.goTo('stats', 'body')}>Body →</button></span>}>
       <div className="g-tiles">
         <div><b>{t.steps !== undefined ? t.steps.toLocaleString() : '–'}</b><span>steps today</span></div>
         <div><b>{fmtSleep(t.sleepMin)}</b><span>sleep{t.sleepScore ? ` · ${t.sleepScore}` : ''}</span></div>
@@ -104,30 +104,58 @@ export function GarminWidget({ data, ui }) {
 }
 
 // ── Stats → Body ──
+// Bar chart: hover (desktop) or tap (phone) a bar to see its exact value
 function Bars({ days, values, max, fmt, color, goal }) {
+  const [sel, setSel] = useState(null)
   const W = 320
   const H = 110
+  const top = 18
   const bw = (W - 10) / days.length
+  const shown = sel ?? days.length - 1
+  const v0 = values[shown]
   return (
-    <svg viewBox={`0 0 ${W} ${H + 16}`} className="bars">
-      {goal && <line x1="0" x2={W} y1={H - (goal / max) * H} y2={H - (goal / max) * H} className="goal-line" />}
-      {days.map((d, i) => {
-        const v = values[i] || 0
-        const h = Math.max(v ? 2 : 0, (Math.min(v, max) / max) * H)
-        return (
-          <g key={d}>
-            <rect x={5 + i * bw + 2} y={H - h} width={bw - 4} height={h} rx="3" fill={color} opacity={d === todayKey() ? 1 : 0.75}>
-              <title>{`${shortDate(d)}: ${v ? fmt(v) : 'no data'}`}</title>
-            </rect>
-            <text x={5 + i * bw + bw / 2} y={H + 12} textAnchor="middle" className="axis">{WEEKDAYS[weekday(d)][0]}</text>
-          </g>
-        )
-      })}
-    </svg>
+    <div className="bars-wrap">
+      <p className="bars-caption">
+        <b>{v0 ? fmt(v0) : 'No data'}</b>
+        <span className="muted"> · {shortDate(days[shown])}{days[shown] === todayKey() ? ' (today)' : ''}</span>
+      </p>
+      <svg viewBox={`0 0 ${W} ${H + top + 16}`} className="bars" onMouseLeave={() => setSel(null)}>
+        <g transform={`translate(0 ${top})`}>
+          {goal && <line x1="0" x2={W} y1={H - (goal / max) * H} y2={H - (goal / max) * H} className="goal-line" />}
+          {days.map((d, i) => {
+            const v = values[i] || 0
+            const h = Math.max(v ? 2 : 0, (Math.min(v, max) / max) * H)
+            const active = i === shown
+            return (
+              <g key={d} onMouseEnter={() => setSel(i)} onClick={() => setSel(i)} style={{ cursor: 'pointer' }}>
+                <rect x={5 + i * bw} y={-top} width={bw} height={H + top + 16} fill="transparent" />
+                <rect x={5 + i * bw + 2} y={H - h} width={bw - 4} height={h} rx="3" fill={color} opacity={active ? 1 : 0.55} />
+                {active && v > 0 && (
+                  <text x={5 + i * bw + bw / 2} y={H - h - 5} textAnchor="middle" className="bar-label">
+                    {fmt(v).split(' ')[0]}
+                  </text>
+                )}
+                <text x={5 + i * bw + bw / 2} y={H + 12} textAnchor="middle" className={`axis ${active ? 'on' : ''}`}>{WEEKDAYS[weekday(d)][0]}</text>
+              </g>
+            )
+          })}
+        </g>
+      </svg>
+    </div>
   )
 }
 
-export function BodyStats({ data }) {
+function SyncLine({ g, ui }) {
+  const { syncing, sync } = ui.garmin
+  return (
+    <div className="sync-line">
+      <span className="muted small">{syncing ? 'Syncing with Garmin…' : `Synced ${ago(g.lastSync)}`}</span>
+      <button className="pill" disabled={syncing} onClick={() => sync()}>↻ Sync</button>
+    </div>
+  )
+}
+
+export function BodyStats({ data, ui }) {
   const g = data.garmin
   if (!g?.enabled) {
     return (
@@ -144,6 +172,8 @@ export function BodyStats({ data }) {
 
   return (
     <>
+      <SyncLine g={g} ui={ui} />
+      {g.error && <div className="error-box">{g.error}</div>}
       <Card title="This week vs last week" icon="⌚">
         <div className="review-stats">
           <div><b>{fmtMinutes(thisWeek.trainingMin)}</b><span>training <em className="muted">{cmp(thisWeek.trainingMin, lastWeek.trainingMin, fmtMinutes)}</em></span></div>

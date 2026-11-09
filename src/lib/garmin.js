@@ -138,7 +138,7 @@ export function parseAll(results) {
       if (!d) continue
       if (path.includes('/steps/')) {
         const steps = deepFind(r, ['totalSteps', 'steps', 'stepCount', 'value'], isNum)
-        if (steps !== undefined) day(d).steps = steps
+        if (steps !== undefined) day(d).steps = Math.max(day(d).steps || 0, steps)
       } else if (path.startsWith('/sleep-service/')) {
         const s = parseSleep(r)
         if (s.sleepMin) day(d).sleepMin = s.sleepMin
@@ -152,7 +152,7 @@ export function parseAll(results) {
         const steps = deepFind(r, ['totalSteps', 'steps'], isNum)
         const rhr = deepFind(r, ['restingHeartRate', 'restingHeartRateValue', 'restingHR', 'restingHr'], isNum)
         const stress = deepFind(r, ['averageStressLevel', 'avgStressLevel', 'overallStressLevel', 'averageStress'], isNum)
-        if (steps !== undefined && day(d).steps === undefined) day(d).steps = steps
+        if (steps !== undefined) day(d).steps = Math.max(day(d).steps || 0, steps) // live summary is often fresher for today
         if (rhr !== undefined) day(d).restingHr = rhr
         if (stress !== undefined && stress >= 0) day(d).stress = stress
         const s = parseSleep(r)

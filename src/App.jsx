@@ -81,13 +81,23 @@ function Shell({ data, actions, status }) {
   }
   const garmin = useGarminSync(data, actions)
 
-  // Garmin: sync on open, at most every 3 hours
-  const autoSynced = useRef(false)
+  // Garmin: sync when the app opens or comes back into view, and every 15 minutes while open
+  const garminRef = useRef({})
+  garminRef.current = { g: data.garmin, garmin, status }
   useEffect(() => {
-    if (status === 'loading' || autoSynced.current || !data.garmin?.enabled) return
-    autoSynced.current = true
-    const last = data.garmin.lastSync || data.garmin.lastAttempt
-    if (!last || Date.now() - new Date(last) > 3 * 3600 * 1000) garmin.sync()
+    const maybeSync = () => {
+      const { g, garmin: gs, status: st } = garminRef.current
+      if (st === 'loading' || !g?.enabled || gs.syncing || document.visibilityState === 'hidden') return
+      const last = g.lastSync || g.lastAttempt
+      if (!last || Date.now() - new Date(last) > 15 * 60 * 1000) gs.sync()
+    }
+    maybeSync()
+    const id = setInterval(maybeSync, 60 * 1000)
+    document.addEventListener('visibilitychange', maybeSync)
+    return () => {
+      clearInterval(id)
+      document.removeEventListener('visibilitychange', maybeSync)
+    }
   }, [status]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const ui = {

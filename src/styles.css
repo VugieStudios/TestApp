@@ -429,3 +429,9 @@ div.insight.example { border: none; }
 .error-box { padding: 10px 12px; border-radius: 10px; background: rgba(255, 107, 107, 0.08); border: 1px solid rgba(255, 107, 107, 0.35); color: var(--danger); font-size: 0.85rem; }
 .warn-text { color: var(--warn); }
 .review-stats em { font-style: normal; }
+.bars-wrap { display: flex; flex-direction: column; gap: 4px; }
+.bars-caption { font-size: 0.9rem; }
+.bars-caption b { font-variant-numeric: tabular-nums; }
+.bars .bar-label { fill: var(--text); font-size: 10px; font-weight: 700; }
+.bars .axis.on { fill: var(--text); font-weight: 700; }
+.sync-line { display: flex; justify-content: space-between; align-items: center; }
