@@ -1,51 +1,6 @@
 import { useRef } from 'react'
 import { lastDays, prettyDate, todayKey } from '../dates.js'
-
-function TrendChart({ days, entries }) {
-  const W = 600
-  const H = 160
-  const pad = 24
-  const x = (i) => pad + (i * (W - pad * 2)) / (days.length - 1)
-  const y = (v) => H - pad - ((v - 1) * (H - pad * 2)) / 4
-
-  const line = (key) => {
-    let d = ''
-    let pen = false
-    days.forEach((day, i) => {
-      const v = entries[day]?.[key]
-      if (v) {
-        d += `${pen ? 'L' : 'M'}${x(i)},${y(v)} `
-        pen = true
-      } else pen = false
-    })
-    return d
-  }
-
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="chart" role="img" aria-label="Mood and energy over the last 30 days">
-      {[1, 3, 5].map((v) => (
-        <g key={v}>
-          <line x1={pad} x2={W - pad} y1={y(v)} y2={y(v)} className="grid" />
-          <text x={4} y={y(v) + 4} className="axis">{v}</text>
-        </g>
-      ))}
-      <path d={line('mood')} className="series mood" />
-      <path d={line('energy')} className="series energy" />
-      {days.map((day, i) =>
-        ['mood', 'energy'].map((k) =>
-          entries[day]?.[k] ? <circle key={day + k} cx={x(i)} cy={y(entries[day][k])} r={3} className={`dot ${k}`} /> : null
-        )
-      )}
-      <text x={pad} y={H - 4} className="axis">{prettyDate(days[0], { day: 'numeric', month: 'short' })}</text>
-      <text x={W - pad} y={H - 4} className="axis" textAnchor="end">Today</text>
-    </svg>
-  )
-}
-
-function avg(values) {
-  const v = values.filter(Boolean)
-  return v.length ? (v.reduce((a, b) => a + b, 0) / v.length).toFixed(1) : '–'
-}
+import { streak } from '../store.js'
 
 export default function Insights({ data, actions }) {
   const days30 = lastDays(30)
@@ -55,10 +10,15 @@ export default function Insights({ data, actions }) {
 
   const rate = (habitId, days) => Math.round((days.filter((d) => data.checks[d]?.[habitId]).length / days.length) * 100)
 
-  // Mood on days you hit all habits vs. days you didn't
-  const tracked = days30.filter((d) => data.entries[d]?.mood && habits.length)
-  const allDone = tracked.filter((d) => habits.every((h) => data.checks[d]?.[h.id]))
-  const notAll = tracked.filter((d) => !allDone.includes(d))
+  // Share of all habits done per day, for the last 30 days
+  const daily = days30.map((d) => {
+    if (!habits.length) return 0
+    return habits.filter((h) => data.checks[d]?.[h.id]).length / habits.length
+  })
+  const perfectDays = daily.filter((v) => v === 1 && habits.length).length
+
+  const goals = data.goals
+  const stepsDone = goals.reduce((n, g) => n + g.steps.filter((s) => s.done).length, 0)
 
   const exportData = () => {
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
@@ -88,28 +48,21 @@ export default function Insights({ data, actions }) {
 
       <section className="card">
         <div className="card-head">
-          <h2>Mood & energy, last 30 days</h2>
+          <h2>Last 30 days</h2>
+          <span className="muted small">{perfectDays} perfect days</span>
         </div>
-        <div className="legend">
-          <span><i className="swatch mood" /> Mood</span>
-          <span><i className="swatch energy" /> Energy</span>
+        <div className="month">
+          {days30.map((d, i) => (
+            <div
+              key={d}
+              className="month-day"
+              title={`${prettyDate(d, { day: 'numeric', month: 'short' })}: ${Math.round(daily[i] * 100)}%`}
+              style={{ '--fill': daily[i] }}
+            />
+          ))}
         </div>
-        <TrendChart days={days30} entries={data.entries} />
-        <div className="stats">
-          <span>7-day mood avg: <b>{avg(days7.map((d) => data.entries[d]?.mood))}</b></span>
-          <span>7-day energy avg: <b>{avg(days7.map((d) => data.entries[d]?.energy))}</b></span>
-        </div>
+        <p className="muted small">Brighter = more habits done that day.</p>
       </section>
-
-      {allDone.length >= 3 && notAll.length >= 3 && (
-        <section className="card">
-          <h2>Do your habits lift your mood?</h2>
-          <p>
-            On days you finished every habit your mood averaged <b>{avg(allDone.map((d) => data.entries[d].mood))}</b>,
-            compared to <b>{avg(notAll.map((d) => data.entries[d].mood))}</b> on other days.
-          </p>
-        </section>
-      )}
 
       <section className="card">
         <h2>Habit consistency</h2>
@@ -117,20 +70,27 @@ export default function Insights({ data, actions }) {
         {habits.map((h) => (
           <div key={h.id} className="bar-row">
             <span className="grow">{h.emoji} {h.name}</span>
-            <span className="muted small">7d {rate(h.id, days7)}%</span>
+            <span className="muted small">🔥{streak(data.checks, h.id)}</span>
             <div className="bar"><div style={{ width: `${rate(h.id, days30)}%` }} /></div>
-            <span className="small">{rate(h.id, days30)}%</span>
+            <span className="small pct">{rate(h.id, days30)}%</span>
           </div>
         ))}
-        <p className="muted small">Bar shows the last 30 days.</p>
+        <p className="muted small">Bar shows the last 30 days. This week overall: {habits.length ? Math.round(habits.reduce((n, h) => n + rate(h.id, days7), 0) / habits.length) : 0}%.</p>
+      </section>
+
+      <section className="card">
+        <h2>Goals</h2>
+        <div className="stats">
+          <span><b>{goals.filter((g) => !g.done).length}</b> active</span>
+          <span><b>{goals.filter((g) => g.done).length}</b> achieved</span>
+          <span><b>{stepsDone}</b> steps completed</span>
+        </div>
       </section>
 
       <section className="card">
         <h2>Your data</h2>
-        <p className="muted">
-          Everything is saved in this browser only. Download a backup now and then, or use it to move your data to another device.
-        </p>
-        <div className="row tight">
+        <p className="muted">Download a backup now and then, or use it to move your data to another device.</p>
+        <div className="row tight wrap">
           <button onClick={exportData}>Download backup</button>
           <button className="ghost" onClick={() => fileRef.current.click()}>Restore backup</button>
           <input ref={fileRef} type="file" accept="application/json" hidden onChange={importData} />

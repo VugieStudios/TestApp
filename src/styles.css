@@ -106,10 +106,6 @@ textarea { resize: vertical; }
 .emoji { font-size: 1.2rem; }
 .streak { font-size: 0.85rem; color: var(--energy); }
 
-.scale { display: flex; gap: 8px; }
-.scale button { flex: 1; font-size: 1.3rem; padding: 10px 0; background: var(--bg); border-color: var(--line); }
-.scale button.selected { background: var(--accent-soft); border-color: var(--accent); }
-
 .stats { display: flex; gap: 16px; flex-wrap: wrap; font-size: 0.9rem; }
 
 .heat { display: grid; grid-template-columns: repeat(14, 1fr); gap: 4px; }
@@ -122,17 +118,27 @@ textarea { resize: vertical; }
 .entry { white-space: pre-wrap; }
 .entry .label { margin-bottom: 2px; }
 
-.chart { width: 100%; height: auto; }
-.chart .grid { stroke: var(--line); }
-.chart .axis { fill: var(--muted); font-size: 11px; }
-.chart .series { fill: none; stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
-.chart .mood { stroke: var(--accent); fill: var(--accent); }
-.chart .energy { stroke: var(--energy); fill: var(--energy); }
-.chart path.series { fill: none; }
-.legend { display: flex; gap: 16px; font-size: 0.82rem; color: var(--muted); }
-.swatch { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 4px; }
-.swatch.mood { background: var(--accent); }
-.swatch.energy { background: var(--energy); }
-
 .bar-row { display: flex; align-items: center; gap: 10px; }
 .bar-row .bar { width: 90px; flex: none; }
+.bar-row .pct { width: 36px; text-align: right; }
+.row.wrap { flex-wrap: wrap; }
+
+.month { display: grid; grid-template-columns: repeat(10, 1fr); gap: 5px; }
+.month-day {
+  aspect-ratio: 1; border-radius: 6px; border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--accent) calc(var(--fill) * 100%), var(--bg));
+}
+
+/* Phone polish */
+html { -webkit-text-size-adjust: 100%; }
+body { -webkit-tap-highlight-color: transparent; overscroll-behavior-y: none; }
+input, textarea { font-size: 16px; } /* stops iPhone zooming in when you tap a field */
+.topbar { padding-top: calc(12px + env(safe-area-inset-top)); }
+.content { padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); }
+@media (max-width: 719px) {
+  h1 { font-size: 1.6rem; }
+  .content { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+  .checklist label { padding: 12px 6px; }
+  .bar-row .bar { width: 60px; }
+  .heat { gap: 3px; }
+}

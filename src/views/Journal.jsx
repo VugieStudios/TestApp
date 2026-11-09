@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { prettyDate } from '../dates.js'
 
-const MOODS = ['😞', '🙁', '😐', '🙂', '😄']
 const FIELDS = [
   ['gratitude', 'Grateful for'],
   ['win', 'Win'],
@@ -19,7 +18,7 @@ export default function Journal({ data }) {
     .filter((d) => {
       const e = data.entries[d]
       const hasText = FIELDS.some(([k]) => e[k]?.trim())
-      if (!hasText && !e.mood) return false
+      if (!hasText) return false
       return !q || FIELDS.some(([k]) => e[k]?.toLowerCase().includes(q))
     })
 
@@ -38,10 +37,6 @@ export default function Journal({ data }) {
           <article key={d} className="card">
             <div className="card-head">
               <h2>{prettyDate(d, { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' })}</h2>
-              <span>
-                {e.mood ? MOODS[e.mood - 1] : ''}
-                {e.energy ? <span className="muted small"> ⚡{e.energy}</span> : ''}
-              </span>
             </div>
             {FIELDS.filter(([k]) => e[k]?.trim()).map(([k, label]) => (
               <p key={k} className="entry">

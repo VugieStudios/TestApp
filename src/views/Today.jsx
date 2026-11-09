@@ -1,29 +1,11 @@
 import { prettyDate, todayKey, daysUntil } from '../dates.js'
 import { streak } from '../store.js'
 
-const MOODS = ['😞', '🙁', '😐', '🙂', '😄']
 const PROMPTS = [
   { key: 'gratitude', label: "I'm grateful for…" },
   { key: 'win', label: "Today's win" },
   { key: 'improve', label: 'Tomorrow I want to do better at…' },
 ]
-
-export function Scale({ value, onChange, labels }) {
-  return (
-    <div className="scale">
-      {labels.map((label, i) => (
-        <button
-          key={i}
-          className={value === i + 1 ? 'selected' : ''}
-          onClick={() => onChange(value === i + 1 ? null : i + 1)}
-          aria-label={`${i + 1} of ${labels.length}`}
-        >
-          {label}
-        </button>
-      ))}
-    </div>
-  )
-}
 
 export default function Today({ data, actions, goTo }) {
   const date = todayKey()
@@ -75,14 +57,6 @@ export default function Today({ data, actions, goTo }) {
             )
           })}
         </ul>
-      </section>
-
-      <section className="card">
-        <h2>Check-in</h2>
-        <p className="label">Mood</p>
-        <Scale value={entry.mood} onChange={(v) => actions.saveEntry(date, { mood: v })} labels={MOODS} />
-        <p className="label">Energy</p>
-        <Scale value={entry.energy} onChange={(v) => actions.saveEntry(date, { energy: v })} labels={['1', '2', '3', '4', '5']} />
       </section>
 
       <section className="card">
