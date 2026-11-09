@@ -1,12 +1,9 @@
 // Grow ↔ Garmin bridge (Supabase Edge Function).
 //
-// Keeps your Garmin Personal API key secret (stored as the GARMIN_API_KEY secret),
-// swaps it for a 24-hour access token, and fetches the Garmin data the app asks for.
-// It only allows read requests to known Garmin data paths, and only for logged-in users
-// of this Supabase project (optionally only the email in GARMIN_ALLOWED_EMAIL).
-// All interpretation of the data happens in the app, so this file rarely needs changing.
-
-import { createClient } from 'npm:@supabase/supabase-js@2'
+// Keeps your Garmin Personal API key secret (GARMIN_API_KEY secret), swaps it for a
+// 24-hour token and fetches the Garmin data the app asks for (read-only, whitelisted paths).
+// It checks the caller's login itself, so "Verify JWT" can be switched off for this function.
+// Optional: GARMIN_ALLOWED_EMAIL limits it to one account.
 
 const BASE = 'https://personal.connectapi.garmin.com'
 const TOKEN_PATH = '/personalapitoken-service/personal-api/personal-api-key/token'
@@ -55,12 +52,12 @@ Deno.serve(async (req) => {
   if (req.method !== 'POST') return json({ error: 'Use POST' }, 405)
 
   try {
-    // Who is asking?
-    const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, {
-      global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } },
-    })
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return json({ error: 'Not logged in' }, 401)
+    // Who is asking? Ask Supabase Auth to check the user's login token.
+    const authHeader = req.headers.get('Authorization') ?? ''
+    const apikey = req.headers.get('apikey') ?? Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+    const who = await fetch(`${Deno.env.get('SUPABASE_URL')}/auth/v1/user`, { headers: { Authorization: authHeader, apikey } })
+    const user = who.ok ? await who.json() : null
+    if (!user?.id) return json({ error: 'Not logged in (log out and in again)' }, 401)
     const allowed = Deno.env.get('GARMIN_ALLOWED_EMAIL')
     if (allowed && user.email?.toLowerCase() !== allowed.toLowerCase()) return json({ error: 'This account may not use Garmin sync' }, 403)
 

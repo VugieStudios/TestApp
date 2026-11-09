@@ -226,7 +226,7 @@ async function readError(error) {
     /* not JSON */
   }
   if (/not found|404/i.test(msg) || error?.context?.status === 404) msg = 'The Garmin bridge is not set up on Supabase yet (function "garmin-sync" not found).'
-  if (/Failed to send a request|fetch/i.test(msg)) msg = 'Could not reach the Garmin bridge. Check your internet connection, or check that the "garmin-sync" function is deployed.'
+  if (/Failed to send a request|fetch/i.test(msg)) msg = 'Could not reach the Garmin bridge. Check that a function named exactly "garmin-sync" is deployed in Supabase and that "Verify JWT" is switched off for it.'
   return msg
 }
 
