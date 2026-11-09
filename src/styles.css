@@ -142,3 +142,18 @@ input, textarea { font-size: 16px; } /* stops iPhone zooming in when you tap a f
   .bar-row .bar { width: 60px; }
   .heat { gap: 3px; }
 }
+
+/* Login + sync status */
+.login {
+  min-height: 100vh; display: flex; align-items: center; justify-content: center;
+  padding: 24px; padding-top: calc(24px + env(safe-area-inset-top));
+}
+.login-card { width: 100%; max-width: 360px; gap: 14px; }
+.login-card h1 { text-align: center; margin-bottom: 4px; }
+.login-logo { font-size: 2.6rem; text-align: center; }
+.login-card .primary { padding: 12px; }
+button:disabled { opacity: 0.5; cursor: default; filter: none; }
+.error { color: var(--danger); font-size: 0.9rem; }
+.sync { font-size: 0.78rem; color: var(--muted); white-space: nowrap; }
+.sync.saved { color: var(--accent); }
+.sync.offline { color: var(--energy); }

@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { addDays, todayKey } from './dates.js'
+import { supabase } from './supabase.js'
 
-// All data lives in one object. Version 1 keeps it in the browser (localStorage).
-// Later this file is the only place that needs to change to sync with a server.
+// All data lives in one object, saved to the user's row in Supabase.
+// A copy is kept in the browser so the app opens instantly and works offline.
 
-const STORAGE_KEY = 'grow-data-v1'
+const LEGACY_KEY = 'grow-data-v1' // data from before logins existed
+const cacheKey = (userId) => `grow-cache-${userId}`
 
 const DEFAULT_DATA = {
   habits: [
@@ -13,17 +15,24 @@ const DEFAULT_DATA = {
     { id: 'h3', name: 'No phone in bed', emoji: '📵', archived: false },
   ],
   checks: {}, // { 'YYYY-MM-DD': { habitId: true } }
-  entries: {}, // { 'YYYY-MM-DD': { mood, energy, gratitude, win, improve, notes } }
+  entries: {}, // { 'YYYY-MM-DD': { gratitude, win, improve, notes } }
   goals: [], // [{ id, title, why, deadline, done, steps: [{ id, text, done }] }]
 }
 
-function load() {
+function readLocal(key) {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return DEFAULT_DATA
-    return { ...DEFAULT_DATA, ...JSON.parse(raw) }
+    const raw = localStorage.getItem(key)
+    return raw ? { ...DEFAULT_DATA, ...JSON.parse(raw) } : null
   } catch {
-    return DEFAULT_DATA
+    return null
+  }
+}
+
+function writeLocal(key, data) {
+  try {
+    localStorage.setItem(key, JSON.stringify(data))
+  } catch {
+    /* storage full or blocked */
   }
 }
 
@@ -31,16 +40,53 @@ export function uid() {
   return Math.random().toString(36).slice(2, 10)
 }
 
-export function useStore() {
-  const [data, setData] = useState(load)
+// status: 'loading' | 'saved' | 'saving' | 'offline'
+export function useStore(user) {
+  const [data, setData] = useState(() => readLocal(cacheKey(user.id)) || readLocal(LEGACY_KEY) || DEFAULT_DATA)
+  const [status, setStatus] = useState('loading')
+  const ready = useRef(false)
+  const timer = useRef(null)
 
+  // Load from the server once after login
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
-    } catch {
-      /* storage full or blocked: keep working in memory */
+    let cancelled = false
+    ;(async () => {
+      const { data: row, error } = await supabase.from('user_data').select('data').eq('user_id', user.id).maybeSingle()
+      if (cancelled) return
+      if (error) {
+        setStatus('offline')
+      } else if (row) {
+        setData({ ...DEFAULT_DATA, ...row.data })
+        setStatus('saved')
+      } else {
+        // First login: move whatever was on this device into the account
+        const initial = readLocal(LEGACY_KEY) || DEFAULT_DATA
+        const { error: insertError } = await supabase.from('user_data').insert({ user_id: user.id, data: initial })
+        if (!cancelled) {
+          setData(initial)
+          setStatus(insertError ? 'offline' : 'saved')
+        }
+      }
+      ready.current = true
+    })()
+    return () => {
+      cancelled = true
     }
-  }, [data])
+  }, [user.id])
+
+  // Save changes: instantly to this device, and to the server after a short pause
+  useEffect(() => {
+    writeLocal(cacheKey(user.id), data)
+    if (!ready.current) return
+    setStatus('saving')
+    clearTimeout(timer.current)
+    timer.current = setTimeout(async () => {
+      const { error } = await supabase
+        .from('user_data')
+        .upsert({ user_id: user.id, data, updated_at: new Date().toISOString() })
+      setStatus(error ? 'offline' : 'saved')
+    }, 800)
+  }, [data, user.id])
 
   const update = (fn) => setData((prev) => fn(structuredClone(prev)))
 
@@ -127,7 +173,7 @@ export function useStore() {
     },
   }
 
-  return [data, actions]
+  return [data, actions, status]
 }
 
 // Consecutive days the habit was done. Today not done yet doesn't break the streak.
