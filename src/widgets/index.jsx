@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import { Card, Ring, XpChip } from '../components/ui.jsx'
 import { PlayerCard } from '../components/game.jsx'
-import { addDays, lastDays, shortDate, todayKey, weekStart } from '../lib/dates.js'
+import { todayKey } from '../lib/dates.js'
 import { habitsForDay, isDone, streakInfo, weekCount } from '../lib/habits.js'
 import { microGoals } from '../lib/goals.js'
 import { questsFor, XP } from '../lib/game.js'
-import { dayStats, insights, MIN_DAYS } from '../lib/analytics.js'
+import { EXAMPLE_INSIGHTS, insights, MIN_DAYS } from '../lib/analytics.js'
 import { fmtTime, useTimer } from '../lib/timer.jsx'
 
 const stepTarget = (goal, step) => ({ type: 'step', id: step.id, goalId: goal.id, label: step.text })
@@ -280,25 +280,6 @@ export function DumpWidget({ data, actions, ui }) {
   )
 }
 
-// ── Mood & energy grid (last 5 weeks) ──
-export function GridWidget({ data, ui }) {
-  const start = addDays(weekStart(todayKey()), -28)
-  const days = lastDays(35, addDays(start, 34))
-  const today = todayKey()
-  return (
-    <Card title="Day quality" icon="▦" right={<button className="link small" onClick={() => ui.goTo('stats')}>Stats →</button>}>
-      <div className="grid7 mini">
-        {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => <span key={i} className="wd">{d}</span>)}
-        {days.map((d) => {
-          const s = d <= today ? dayStats(data, d) : null
-          return <div key={d} className={`cell ${d === today ? 'today' : ''} ${s?.low ? 'low' : ''}`} style={{ '--v': s?.score ?? -1 }} title={shortDate(d)} />
-        })}
-      </div>
-      <p className="muted small">Score = habits + focus + progress. Brighter is better.</p>
-    </Card>
-  )
-}
-
 // ── Insights ──
 export function InsightsWidget({ data, ui }) {
   const ins = insights(data)
@@ -306,9 +287,14 @@ export function InsightsWidget({ data, ui }) {
     <Card title="Insights" icon="✦" right={<button className="link small" onClick={() => ui.goTo('stats')}>More →</button>}>
       {!ins.ready ? (
         <>
-          <p className="muted">Insights unlock after {MIN_DAYS} days of tracking habits.</p>
+          <p className="muted">Your real insights unlock after {MIN_DAYS} days of tracking ({ins.have}/{MIN_DAYS}). Here's what they look like:</p>
           <div className="progress"><div style={{ width: `${(ins.have / MIN_DAYS) * 100}%` }} /></div>
-          <p className="muted small">{ins.have}/{MIN_DAYS} days</p>
+          {EXAMPLE_INSIGHTS.slice(0, 2).map((x, i) => (
+            <div key={i} className="insight example">
+              <span className="insight-icon">{x.icon}</span>
+              <div><b>{x.title} <span className="tag">example</span></b><p className="muted small">{x.text}</p></div>
+            </div>
+          ))}
         </>
       ) : ins.list.length === 0 ? (
         <p className="muted">No clear patterns yet. Keep tracking.</p>
@@ -333,13 +319,12 @@ export const WIDGETS = {
   tasks: { name: 'Tasks', component: TasksWidget },
   journal: { name: 'Journal', component: JournalWidget, low: true },
   dump: { name: 'Brain dump', component: DumpWidget, low: true },
-  grid: { name: 'Day quality grid', component: GridWidget },
   insights: { name: 'Insights', component: InsightsWidget },
 }
 
 export const PRESETS = {
-  Balanced: ['player', 'quests', 'habits', 'micro', 'focus', 'tasks', 'journal', 'dump', 'grid', 'insights'],
-  'Deep work': ['focus', 'micro', 'tasks', 'habits', 'quests', 'dump', 'player', 'journal', 'grid', 'insights'],
-  Wellbeing: ['journal', 'dump', 'habits', 'quests', 'grid', 'insights', 'player', 'micro', 'focus', 'tasks'],
+  Balanced: ['player', 'quests', 'habits', 'micro', 'focus', 'tasks', 'journal', 'dump', 'insights'],
+  'Deep work': ['focus', 'micro', 'tasks', 'habits', 'quests', 'dump', 'player', 'journal', 'insights'],
+  Wellbeing: ['journal', 'dump', 'habits', 'quests', 'insights', 'player', 'micro', 'focus', 'tasks'],
 }
 

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Card, Seg, XpChip } from '../components/ui.jsx'
 import { addDays, addMonths, fmtMinutes, monthEnd, monthKey, monthStart, prettyDate, range, shortDate, todayKey, weekday, weekStart } from '../lib/dates.js'
-import { dayStats, insights, MIN_DAYS, periodFor, review, shiftPeriod } from '../lib/analytics.js'
+import { dayStats, EXAMPLE_INSIGHTS, insights, MIN_DAYS, periodFor, review, shiftPeriod } from '../lib/analytics.js'
 import { XP } from '../lib/game.js'
 
 const METRICS = [
@@ -115,11 +115,19 @@ function Insights({ data }) {
     <>
       <Trend data={data} />
       {!ins.ready ? (
-        <Card title="Pattern insights" icon="✦">
-          <p className="muted">After {MIN_DAYS} days of tracking, the app starts spotting patterns: which habits help each other, your strong and weak days, and how focus and journaling affect your consistency.</p>
-          <div className="progress"><div style={{ width: `${(ins.have / MIN_DAYS) * 100}%` }} /></div>
-          <p className="muted small">{ins.have}/{MIN_DAYS} days</p>
-        </Card>
+        <>
+          <Card title="Pattern insights" icon="✦">
+            <p className="muted">After {MIN_DAYS} days of tracking, the app starts spotting patterns: which habits help each other, your strong and weak days, and how focus and journaling affect your consistency.</p>
+            <div className="progress"><div style={{ width: `${(ins.have / MIN_DAYS) * 100}%` }} /></div>
+            <p className="muted small">{ins.have}/{MIN_DAYS} days · below are examples of what you'll see</p>
+          </Card>
+          {EXAMPLE_INSIGHTS.map((x, i) => (
+            <section key={i} className="card insight big example">
+              <span className="insight-icon">{x.icon}</span>
+              <div><h2>{x.title} <span className="tag">example</span></h2><p className="muted">{x.text}</p></div>
+            </section>
+          ))}
+        </>
       ) : ins.list.length === 0 ? (
         <Card title="Pattern insights" icon="✦"><p className="muted">No strong patterns in the last 60 days yet. Keep tracking.</p></Card>
       ) : (

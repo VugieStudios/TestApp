@@ -414,3 +414,5 @@ input[type='checkbox'] { width: 20px; height: 20px; accent-color: var(--accent);
 .unit-input span { color: var(--muted); font-weight: 600; }
 .danger-zone { border-color: rgba(255, 107, 107, 0.3); }
 .danger-btn { background: var(--danger); color: #2a0606; border-color: var(--danger); }
+.insight.example { opacity: 0.6; border-style: dashed; }
+div.insight.example { border: none; }

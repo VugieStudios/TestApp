@@ -46,6 +46,17 @@ const pctTxt = (v) => `${Math.round(v * 100)}%`
 
 export const MIN_DAYS = 7
 
+// Shown (clearly labelled) until there is enough real data
+export const EXAMPLE_INSIGHTS = [
+  { icon: '🔗', title: 'Gym → Read 10 pages', text: 'On days you go to the gym, you also read 86% of the time, versus 40% on days you skip it. Stack them: do them right after each other.' },
+  { icon: '📅', title: 'Tue is your strongest day', text: 'You complete 92% of your habits on Tue but only 45% on Sat. Keep Sat light, or use Low Energy Mode then.' },
+  { icon: '🌙', title: 'No phone in bed needs help', text: 'You do it 55% of the time, and Fri is the hardest day (20%). Plan it earlier on Fridays, or make it smaller that day.' },
+  { icon: '⏱', title: 'Focus days are habit days', text: 'On days with a focus session you complete 84% of your habits, versus 58% without. One focus block seems to set the tone for your day.' },
+  { icon: '✎', title: 'Reflecting pays off', text: 'The day after you journal, you complete 18% more of your habits.' },
+  { icon: '📈', title: 'You are building momentum', text: 'Last 2 weeks: 78% of habits done, versus 61% the 2 weeks before.' },
+  { icon: '🪫', title: 'Recurring energy drains', text: '"phone", "late", "exams" keep showing up in your journal. Can you remove or reduce one of them?' },
+]
+
 export function insights(data, days = 60) {
   const stats = lastDays(days).map((d) => dayStats(data, d))
   const tracked = stats.filter((s) => s.completion !== null)

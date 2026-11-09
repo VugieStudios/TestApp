@@ -35,7 +35,6 @@ export const DEFAULT_DASHBOARD = [
   'tasks',
   'journal',
   'dump',
-  'grid',
   'insights',
 ].map((id) => ({ id, hidden: false }))
 
